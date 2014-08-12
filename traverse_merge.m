@@ -1,12 +1,19 @@
 % TRAVERSE_MERGE Extract merged layer data from melt/icebridge/data/.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 08/07/14
+% Last updated: 08/11/14
 
 clear all
 
+radar_type                  = 'deep';
+
 % load transect data
-load mat/xy_all num_year num_trans name_year name_trans
+switch radar_type
+    case 'accum'
+        load mat/xy_all_accum num_year num_trans name_year name_trans
+    case 'deep'
+        load mat/xy_all num_year num_trans name_year name_trans
+end
 
 % dummy letters
 letters                     = 'a':'z';
@@ -136,6 +143,13 @@ for ii = 1:num_year
 end
 
 disp('Saving merged data...')
-save('mat/merge_all', '-v7.3', 'depth_smooth', 'dist', 'elev_air_gimp', 'elev_bed_gimp', 'elev_smooth_gimp', 'elev_surf_gimp', 'file_block', 'ind_decim', 'ind_decim_mid', 'ind_fence', 'ind_layer', 'ind_trace_start', 'int_bed', 'int_smooth', 'int_surf', 'num_decim', 'num_fence', 'num_layer', ...
-                               'num_trace_tot', 'thick', 'thick_decim', 'twtt_surf', 'x_pk', 'y_pk')
-disp('Saved merged data in mat/merge_all.mat.')
+switch radar_type
+    case 'accum'
+        save('mat/merge_all_accum', '-v7.3', 'depth_smooth', 'dist', 'elev_air_gimp', 'elev_bed_gimp', 'elev_smooth_gimp', 'elev_surf_gimp', 'file_block', 'ind_decim', 'ind_decim_mid', 'ind_fence', 'ind_layer', 'ind_trace_start', 'int_bed', 'int_smooth', 'int_surf', 'num_decim', 'num_fence', ...
+                                             'num_layer', 'num_trace_tot', 'thick', 'thick_decim', 'twtt_surf', 'x_pk', 'y_pk')
+        disp('Saved merged data in mat/merge_all_accum.mat.')
+    case 'deep'
+        save('mat/merge_all', '-v7.3', 'depth_smooth', 'dist', 'elev_air_gimp', 'elev_bed_gimp', 'elev_smooth_gimp', 'elev_surf_gimp', 'file_block', 'ind_decim', 'ind_decim_mid', 'ind_fence', 'ind_layer', 'ind_trace_start', 'int_bed', 'int_smooth', 'int_surf', 'num_decim', 'num_fence', 'num_layer', ...
+            'num_trace_tot', 'thick', 'thick_decim', 'twtt_surf', 'x_pk', 'y_pk')
+        disp('Saved merged data in mat/merge_all.mat.')
+end
