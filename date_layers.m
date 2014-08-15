@@ -1,7 +1,7 @@
 % DATE_LAYERS Date layers using ice-core depth/age scales and 1D/2D interpolation/extrapolation or quasi-Nye dating of overlapping dated layers.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 08/08/14
+% Last updated: 08/15/14
 
 clear
 
@@ -407,10 +407,7 @@ if do_date
     
     num_master              = length(layer_bin);
     age_master              = NaN(num_master, (num_core + 6));
-    
-    % matrix of intersections between merged picks files and ice-core sites
-    int_core_merge          = [];
-    
+        
 %% 
     
     disp('Dating core-intersecting layers in core-intersecting transects...')
@@ -423,91 +420,94 @@ if do_date
         % loop through merged picks files
         for jj = 1:num_trans(ii)
             
-            % skip if no core intersection or if no core intersection with available depth-age scale
-            if isempty(int_core{ii}{jj})
-                continue
-            elseif isempty(find(core_avail(int_core{ii}{jj}(:, 3)), 1))
-                continue
-            end
-            
             % loop through all merged picks file for current transect
             for kk = 1:length(ind_fence{ii}{jj})
                 
-                % check to see if merged picks file intersects core by looping through each core to be considered
-                ind_int_core= NaN(1, num_core);
-                for ll = 1:size(int_core{ii}{jj}, 1)
-                    try %#ok<TRYNC>
-                        [dist_min_core, ind_min_core] ...
-                            = min(sqrt(((x_pk{ii}{jj}{kk} - int_core{ii}{jj}(ll, 4)) .^ 2) + ((y_pk{ii}{jj}{kk} - int_core{ii}{jj}(ll, 5)) .^ 2))); % distance/index closest between transect's picks and core
-                        if (dist_min_core < rad_threshold) % only keep intersection if less than rad_threshold (currently 2.5 km)
-                            ind_int_core(int_core{ii}{jj}(ll, 3)) ...
-                            = ind_min_core;
-                        end
-                    end
-                end
-                
-                % NaN out core intersections if core depth-age scale is not available
-                ind_int_core(int_core{ii}{jj}(~core_avail(int_core{ii}{jj}(:, 3)), 3)) ...
-                            = NaN;
-                
-                int_core_merge ...
-                            = [int_core_merge; repmat([ii jj kk], length(find(~isnan(ind_int_core))), 1) find(~isnan(ind_int_core))' ind_int_core(~isnan(ind_int_core))']; %#ok<AGROW>
-                
-                % skip if none of the merged picks file intersects core
-                if all(isnan(ind_int_core))
+                % skip if no core intersection or if no core intersection with available depth-age scale
+                if isempty(ismember(int_core_merge(:, 1:3), [ii jj kk], 'rows'))
                     continue
-                else
-                    disp([name_trans{ii}{jj} letters(kk) '...'])
+                elseif isempty(find(core_avail(int_core_merge(ismember(int_core_merge(:, 1:3), [ii jj kk], 'rows'), 4)), 1))
+                    continue
                 end
+                
+                disp([name_trans{ii}{jj} letters(kk) '...'])
+                
+                ind_int_core= int_core_merge((ismember(int_core_merge(:, 1:3), [ii jj kk], 'rows') & core_avail(int_core_merge(:, 4))), 4:5);
                 
                 % loop through good core intersections
                 [age_uncert_radar, age_uncert_interp] ...
                             = deal(NaN(num_layer{ii}{jj}(kk), num_core));
                 
-                for ll = find(~isnan(ind_int_core))
+                for ll = size(ind_int_core, 1)
                     
                     % unique values of distance vector
                     [dist_curr, ind_sort] ...
                             = unique(dist{ii}{jj}{kk});
                     
                     % smooth near-intersection layer depths if intersection index is unique
-                    if ~isempty(find((ind_sort == ind_int_core(ll)), 1))
+                    if ~isempty(find((ind_sort == ind_int_core(ll, 2)), 1))
                         depth_curr ...
                             = depth_smooth{ii}{jj}{kk}(:, ind_sort);
                         depth_curr ...
-                            = nanmean(depth_curr(:, interp1(dist_curr, 1:length(dist_curr), (dist_curr(find((ind_sort == ind_int_core(ll)), 1)) - dist_int_max), 'nearest', 'extrap'):...
-                                                    interp1(dist_curr, 1:length(dist_curr), (dist_curr(find((ind_sort == ind_int_core(ll)), 1)) + dist_int_max), 'nearest', 'extrap')), 2);
+                            = nanmean(depth_curr(:, interp1(dist_curr, 1:length(dist_curr), (dist_curr(find((ind_sort == ind_int_core(ll, 2)), 1)) - dist_int_max), 'nearest', 'extrap'):...
+                                                    interp1(dist_curr, 1:length(dist_curr), (dist_curr(find((ind_sort == ind_int_core(ll, 2)), 1)) + dist_int_max), 'nearest', 'extrap')), 2);
                     else
                         depth_curr ...
-                            = depth_smooth{ii}{jj}{kk}(:, ind_int_core(ll));
+                            = depth_smooth{ii}{jj}{kk}(:, ind_int_core(ll, 2));
                     end
                     
                     for mm = find(~isnan(depth_curr))' % loop through each of the merged picks file layers, only interpolate age if layer present at core intersection
-                        age_core{ii}{jj}{kk}(mm, ll) ...
-                            = interp1(core{ll}.depth(~isnan(core{ll}.age)), core{ll}.age(~isnan(core{ll}.age)), depth_curr(mm), 'linear', 'extrap'); % interpolated age at core intersection
+                        
+                        age_core_curr ...
+                            = interp1(core{ind_int_core(ll, 1)}.depth(~isnan(core{ind_int_core(ll, 1)}.age)), core{ind_int_core(ll, 1)}.age(~isnan(core{ind_int_core(ll, 1)}.age)), depth_curr(mm), 'linear', 'extrap'); % interpolated age at core intersection
+                        % adjust if transect intersects the same ice core multiple times
+                        if isnan(age_core{ii}{jj}{kk}(mm, ind_int_core(ll, 1)))
+                            age_core{ii}{jj}{kk}(mm, ind_int_core(ll, 1)) ...
+                                = age_core_curr;
+                        else
+                            age_core{ii}{jj}{kk}(mm, ind_int_core(ll, 1)) ...
+                                = nanmean([age_core_curr age_core{ii}{jj}{kk}(mm, ind_int_core(ll, 1))]);
+                        end
+                        
                         % get signal-to-noise ratio
-                        if isnan(snr_all{ii}{jj}{kk}(mm, ll))
+                        if isnan(snr_all{ii}{jj}{kk}(mm, ind_int_core(ll, 1)))
                             snr_curr ...
-                                = nanmean(snr_all{ii}{jj}{kk}(:, ll));
+                                = nanmean(snr_all{ii}{jj}{kk}(:, ind_int_core(ll, 1)));
                             if isnan(snr_curr)
                                 snr_curr ...
                                     = snr_ref;
                             end
                         else
                             snr_curr ...
-                                = snr_all{ii}{jj}{kk}(mm, ll);
+                                = snr_all{ii}{jj}{kk}(mm, ind_int_core(ll, 1));
                         end
+                        
                         % radar-induced uncertainty (range resolution / sqrt(snr))
-                        age_uncert_radar(mm, ll) ...
-                            = 0.5 * sum(abs(interp1(core{ll}.depth(~isnan(core{ll}.age)), core{ll}.age(~isnan(core{ll}.age)), (depth_curr(mm) + ([range_resolution(ii) -range_resolution(ii)] ./ sqrt(snr_curr))), 'linear', 'extrap') - repmat(age_core{ii}{jj}{kk}(mm, ll), 1, 2)));
+                        age_uncert_radar_curr ...
+                            = 0.5 * sum(abs(interp1(core{ind_int_core(ll, 1)}.depth(~isnan(core{ind_int_core(ll, 1)}.age)), core{ind_int_core(ll, 1)}.age(~isnan(core{ind_int_core(ll, 1)}.age)), ...
+                                    (depth_curr(mm) + ([range_resolution(ii) -range_resolution(ii)] ./ sqrt(snr_curr))), 'linear', 'extrap') - repmat(age_core{ii}{jj}{kk}(mm, ind_int_core(ll, 1)), 1, 2)));
+                        if isnan(age_uncert_radar(mm, ind_int_core(ll, 1)))
+                            age_uncert_radar(mm, ind_int_core(ll, 1)) ...
+                                = age_uncert_radar_curr;
+                        else
+                            age_uncert_radar(mm, ind_int_core(ll, 1)) ...
+                                = nanmean([age_uncert_radar_curr age_uncert_radar(mm, ind_int_core(ll, 1))]);
+                        end
                     end
                     
-                    if core_uncert_avail(ll) % interpolated age uncertainty at core intersection
-                        age_uncert_interp(~isnan(depth_curr), ll) ...
-                            = interp1(core{ll}.depth(~isnan(core{ll}.age_uncert)), core{ll}.age_uncert(~isnan(core{ll}.age_uncert)), depth_curr(~isnan(depth_curr)), 'linear', 'extrap');
+                    if core_uncert_avail(ind_int_core(ll, 1)) % interpolated age uncertainty at core intersection
+                        age_uncert_interp_curr ...
+                            = interp1(core{ind_int_core(ll, 1)}.depth(~isnan(core{ind_int_core(ll, 1)}.age_uncert)), core{ind_int_core(ll, 1)}.age_uncert(~isnan(core{ind_int_core(ll, 1)}.age_uncert)), depth_curr(~isnan(depth_curr)), 'linear', 'extrap');
                     else % otherwise (NorthGRIP age uncertainty) + range resolution uncertainty
-                        age_uncert_interp(~isnan(depth_curr), ll) ...
-                            = interp1(core{6}.age, core{6}.age_uncert, age_core{ii}{jj}{kk}(~isnan(depth_curr), ll), 'linear', 'extrap');
+                        age_uncert_interp_curr ...
+                            = interp1(core{6}.age, core{6}.age_uncert, age_core{ii}{jj}{kk}(~isnan(depth_curr), ind_int_core(ll, 1)), 'linear', 'extrap');
+                    end
+                    if isnan(age_uncert_radar(mm, ind_int_core(ll, 1)))
+                        age_uncert_interp(~isnan(depth_curr), ind_int_core(ll, 1)) ...
+                            = age_uncert_interp_curr;
+                    else
+                        age_uncert_interp(~isnan(depth_curr), ind_int_core(ll, 1)) ...
+                            = nanmean([age_uncert_interp_curr age_uncert_interp(~isnan(depth_curr), ind_int_core(ll, 1))]);
                     end
                     
                     % order in which layers were dated
@@ -706,11 +706,11 @@ if do_date
         disp('Saving layer ages...')
         switch radar_type
             case 'accum'
-                save('mat/date_all_accum', '-v7.3', 'age', 'age_core', 'age_master', 'age_match', 'age_ord', 'age_n', 'age_range', 'age_type', 'age_uncert', 'age_uncert_rel_max', 'dist_int_max', 'layer_bin', 'int_core_merge')
+                save('mat/date_all_accum', '-v7.3', 'age', 'age_core', 'age_master', 'age_match', 'age_ord', 'age_n', 'age_range', 'age_type', 'age_uncert', 'age_uncert_rel_max', 'dist_int_max', 'layer_bin')
 %                 save('mat/date_all_accum_ngrip_strain', '-v7.3', 'age', 'age_core', 'age_uncert', 'age_type', 'dist_int_max')
                 disp('Layer ages saved as mat/date_all_accum.mat.')                
             case 'deep'
-                save('mat/date_all', '-v7.3', 'age', 'age_core', 'age_master', 'age_match', 'age_ord', 'age_n', 'age_range', 'age_type', 'age_uncert', 'age_uncert_rel_max', 'dist_int_max', 'layer_bin', 'int_core_merge')
+                save('mat/date_all', '-v7.3', 'age', 'age_core', 'age_master', 'age_match', 'age_ord', 'age_n', 'age_range', 'age_type', 'age_uncert', 'age_uncert_rel_max', 'dist_int_max', 'layer_bin')
 %                 save('mat/date_all_ngrip_lin', '-v7.3', 'age', 'age_core', 'age_uncert', 'age_type', 'dist_int_max')
                 disp('Layer ages saved as mat/date_all.mat.')
         end
