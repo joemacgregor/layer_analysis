@@ -141,7 +141,8 @@ for ii = 1:num_overlap_max
         age_overlap(ii)     = NaN;
     end
 end
-age_overlap(isinf(age_overlap) | (age_overlap < 0) | (age_overlap > age_max) | ((depth_curr > depth_slice(2, :)) & (age_overlap < age_slice(2, :))) | ((depth_curr < depth_slice(1, :)) & (age_overlap > age_slice(1, :)))) ...
+age_overlap(isinf(age_overlap) | (age_overlap < 0) | (age_overlap > age_max) | ((depth_curr > depth_slice(2, :)) & (age_overlap < age_slice(2, :))) | ((depth_curr < depth_slice(1, :)) & (age_overlap > age_slice(1, :))) | ...
+            (((depth_curr > depth_slice(1, :)) & (depth_curr < depth_slice(2, :))) & ((age_overlap < age_slice(1, :)) | age_overlap > age_slice(2, :)))) ...
                             = NaN;
 
 % weighted mean

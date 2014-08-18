@@ -919,7 +919,8 @@ if do_grd1
                                     age_norm1{ii}{jj}{kk}(mm, ll) ...
                                         = date_strain(depth_bound, age_bound, strain_rate_decim(ll), depth_curr(mm), tol, iter_max, 'age');
                                     % sanity check
-                                    if (((depth_curr(mm) > depth_bound(1)) && (age_norm1{ii}{jj}{kk}(mm, ll) < age_bound(1))) || ((depth_curr(mm) < depth_bound(2)) && (age_norm1{ii}{jj}{kk}(mm, ll) > age_bound(2))))
+                                    if (((depth_curr(mm) > depth_bound(2)) && (age_norm1{ii}{jj}{kk}(mm, ll) < age_bound(2))) || ((depth_curr(mm) < depth_bound(1)) && (age_norm1{ii}{jj}{kk}(mm, ll) > age_bound(1))) || ...
+                                        (((depth_curr(mm) > depth_bound(1)) && (depth_curr(mm) < depth_bound(2))) && ((age_norm1{ii}{jj}{kk}(mm, ll) < age_bound(1)) || (age_norm1{ii}{jj}{kk}(mm, ll) > age_bound(2)))))
                                         age_norm1{ii}{jj}{kk}(mm, ll) ...
                                             = NaN;
                                     end
@@ -963,7 +964,8 @@ if do_grd1
                                 if (~isempty(depth_bound) && ~isempty(age_bound) && (diff(depth_bound) > 0) && (diff(age_bound) > 0))
                                     depth_iso1{ii}{jj}{kk}(mm, ll) ...
                                         = date_strain(depth_bound, age_bound, strain_rate_decim(ll), age_iso(mm), tol, iter_max, 'depth');
-                                    if (((age_iso(mm) > age_bound(1)) && (depth_iso1{ii}{jj}{kk}(mm, ll) < depth_bound(1))) || ((age_iso(mm) < age_bound(2)) && (depth_iso1{ii}{jj}{kk}(mm, ll) > depth_bound(2))))
+                                    if (((age_iso(mm) > age_bound(2)) && (depth_iso1{ii}{jj}{kk}(mm, ll) < depth_bound(2))) || ((age_iso(mm) < age_bound(1)) && (depth_iso1{ii}{jj}{kk}(mm, ll) > depth_bound(1))) || ...
+                                        (((age_iso(mm) > age_bound(1)) && (age_iso(mm) < age_bound(2))) && ((depth_iso1{ii}{jj}{kk}(mm, ll) < depth_bound(1)) || (depth_iso1{ii}{jj}{kk}(mm, ll) > depth_bound(2)))))
                                         depth_iso1{ii}{jj}{kk}(mm, ll) ...
                                             = NaN;
                                     end
