@@ -6,7 +6,7 @@ function [age, age_ord, age_n, age_range, age_type, age_uncert, date_counter, in
 % To be used within DATE_LAYERS only.
 %
 % Joe MacGregor
-% Last updated: 08/08/14
+% Last updated: 08/18/14
 
 % determine which traces are potentially usable because they have at least two dated layers
 ind_trace_usable            = find(sum(~isnan(depth(~isnan(age), :)), 1) > 1);
@@ -117,7 +117,7 @@ switch interp_type
             end
         end
         
-    case 'strain'
+    case 'quasi Nye'
         
         % quasi-Nye dating using bounding or sufficiently near dated reflectors
         if (parallel_check && (num_overlap_max > (3 * num_pool)))
@@ -141,7 +141,7 @@ for ii = 1:num_overlap_max
         age_overlap(ii)     = NaN;
     end
 end
-age_overlap(isinf(age_overlap) | (age_overlap < 0) | (age_overlap > age_max) | ((depth_curr > depth_slice(1, :)) & (age_overlap < age_slice(1, :))) | ((depth_curr < depth_slice(2, :)) & (age_overlap > age_slice(2, :)))) ...
+age_overlap(isinf(age_overlap) | (age_overlap < 0) | (age_overlap > age_max) | ((depth_curr > depth_slice(2, :)) & (age_overlap < age_slice(2, :))) | ((depth_curr < depth_slice(1, :)) & (age_overlap > age_slice(1, :)))) ...
                             = NaN;
 
 % weighted mean

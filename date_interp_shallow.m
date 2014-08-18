@@ -5,7 +5,7 @@ function [age, age_ord, age_n, age_range, age_type, age_uncert, date_counter] ..
 % To be used within DATE_LAYERS only.
 % 
 % Joe MacGregor
-% Last updated: 08/08/14
+% Last updated: 08/18/14
 
 % determine which traces are potentially usable because they have at least one dated layer
 ind_overlap                 = find((sum(~isnan(depth(~isnan(age), :)), 1) > 0) & ~isnan(depth(curr_layer, :)));
@@ -68,7 +68,7 @@ end
 switch interp_type
     case 'lin'
         age_overlap         = age_slice .* (depth_curr ./ depth_bot);
-    case 'strain'
+    case 'quasi Nye'
         % quasi-Nye dating for shallow reflectors
         age_overlap         = age_slice .* (log(1 - (depth_curr ./ thick_curr)) ./ log(1 - (depth_bot ./ thick_curr)));
 end

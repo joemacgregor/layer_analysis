@@ -1,7 +1,7 @@
 % DATE_LAYERS Date layers using ice-core depth/age scales and 1D/2D interpolation/extrapolation or quasi-Nye dating of overlapping dated layers.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 08/15/14
+% Last updated: 08/18/14
 
 clear
 
@@ -15,7 +15,7 @@ switch radar_type
         do_age_check        = true;
         do_match            = [true true];
         do_interp           = true;
-        interp_type         = 'strain';
+        interp_type         = 'quasi Nye';
         do_save             = false;
         do_grd1             = false;
         do_grd2             = false;
@@ -26,14 +26,14 @@ switch radar_type
         do_age_check        = true;
         do_match            = [true true];
         do_interp           = true;
-        interp_type         = 'strain';
+        interp_type         = 'quasi Nye';
         do_save             = true;
         do_grd1             = true;
         do_grd2             = true;
         do_nye_norm         = true;
 end
 
-% variables
+% variables of interest
 switch radar_type
     case 'accum'
         age_uncert_rel_max  = 0.1; % maximum relative age uncertainty
@@ -50,6 +50,7 @@ switch radar_type
         depth_shallow_max   = 0.05; % maximum fraction of ice thickness to attempt shallow fitting
         num_date_loop_max   = 10; % maximum number of dating loops
         age_max             = 1e4; % maximum permitted reflector age
+        year_ord            = [1 2 3]; % order in which to analyze years/campaigns based on their overall data quality
     case 'deep'
         age_uncert_rel_max  = 0.25; % maximum relative age uncertainty
         dist_int_max        = 0.25; % km, +/- range to extract core-intersecting layer depths
@@ -65,6 +66,7 @@ switch radar_type
         depth_shallow_max   = 0.2; % maximum fraction of ice thickness to attempt shallow fitting
         num_date_loop_max   = 10; % maximum number of dating loops
         age_max             = 1.5e5; % maximum permitted reflector age
+        year_ord            = [17 19 20 6 7 8 4 9 5 2 3 12 1 13 15 16 18 11 10 14]; % order in which to analyze years/campaigns based on their overall data quality
 end
 
 core_avail                  = true(1, 6);
@@ -89,13 +91,6 @@ switch radar_type
 end
 load mat/greenland_bed_v3 elev_surf elev_bed mask_greenland mask_gris x y
 
-% order in which to analyze years/campaigns based on their overall data quality
-switch radar_type
-    case 'accum'
-        year_ord            = [1 2 3];
-    case 'deep'
-        year_ord            = [17 19 20 6 7 8 4 9 5 2 3 12 1 13 15 16 18 11 10 14];
-end
 % do not permit matches between campaigns at far end of period from each other, i.e., ICORDS cannot be matched with MCoRDSv2
 year_match                  = true(num_year);
 switch radar_type
@@ -160,7 +155,7 @@ clear elev_bed elev_surf mask_greenland mask_gris
 clear x_tmp y_tmp
 thick_grd                   = elev_surf_grd - elev_bed_grd;
 
-if strcmp(interp_type, 'strain')
+if strcmp(interp_type, 'quasi Nye')
     load mat/greenland_cism accum x y
     [accum, x_cism, y_cism] = deal(double(accum), x, y);
     clear x y
@@ -232,7 +227,7 @@ if do_date
         end
     end
     
-    % clean up matching list
+    % clean up matching list by putting earlier year first
     for ii = 1:size(id_layer_master_mat, 1)
         if ((id_layer_master_mat(ii, 1) > id_layer_master_mat(ii, 5)) || ((id_layer_master_mat(ii, 1) == id_layer_master_mat(ii, 5)) && (id_layer_master_mat(ii, 2) > id_layer_master_mat(ii, 6))) || ...
            ((id_layer_master_mat(ii, 1) == id_layer_master_mat(ii, 5)) && (id_layer_master_mat(ii, 2) == id_layer_master_mat(ii, 6)) && (id_layer_master_mat(ii, 3) > id_layer_master_mat(ii, 7))) || ...
@@ -241,7 +236,7 @@ if do_date
                             = id_layer_master_mat(ii, [5:8 1:4]);
         end
     end
-    id_layer_master_mat     = unique(id_layer_master_mat, 'rows');    
+    id_layer_master_mat     = unique(id_layer_master_mat, 'rows');
     
     disp('Assigning master IDs within campaigns...')
     
@@ -405,6 +400,7 @@ if do_date
     % remove matches with no master ID (i.e., retroactively not permitted matches)
     id_layer_master_mat     = id_layer_master_mat(~isnan(id_layer_master_mat(:, end)), :);
     
+    % initialize master age list
     num_master              = length(layer_bin);
     age_master              = NaN(num_master, (num_core + 6));
         
@@ -517,7 +513,7 @@ if do_date
                             = date_counter + 1;
                 end
                 
-                % assign ages, their uncertainties, range and number of  (0 for layers at closest trace in core-intersecting transects)
+                % assign core-intersecting ages, uncertainties, range, number of layers used (1) and type (0 for layers at closest trace in core-intersecting transects)
                 age{ii}{jj}{kk} ...
                             = nanmean(age_core{ii}{jj}{kk}, 2);
                 age_uncert{ii}{jj}{kk} ...
@@ -557,6 +553,8 @@ if do_date
         for jj = 1:num_trans(ii)
             age_old{ii}{jj} = cell(1, length(ind_fence{ii}{jj}));
             for kk = 1:length(ind_fence{ii}{jj})
+                age_old{ii}{jj}{kk} ...
+                            = NaN(num_layer{ii}{jj}(kk), 1);
                 num_layer_dated_all ...
                             = num_layer_dated_all + length(find(~isnan(age{ii}{jj}{kk})));
             end
@@ -569,14 +567,17 @@ if do_date
     % keep going until dating does not improve anymore
     while ((num_layer_dated_all > num_layer_dated_old) && (num_date_loop <= num_date_loop_max))
         
+        % don't bother if dating interpolation not requested
+        if ~do_interp
+            break
+        end
+        
         disp(['Dating loop #' num2str(num_date_loop) '...'])
         
         % loop through years/campaigns
         for ii = year_ord
             
-            if ~do_interp
-                continue
-            elseif (ii == year_ord(1))
+            if (ii == year_ord(1))
                 disp('Dating overlapping layers in all transects...')
             end
             
@@ -607,7 +608,7 @@ if do_date
                             = age{ii}{jj}{kk};
                     
                     % Nye strain rate to initialize strain dating
-                    if strcmp(interp_type, 'strain')
+                    if strcmp(interp_type, 'quasi Nye')
                         strain_rate_curr ...
                             = double(interp2(x_grd, y_grd, accum, x_pk{ii}{jj}{kk}, y_pk{ii}{jj}{kk}, 'linear', NaN) ./ thick{ii}{jj}{kk});
                         strain_rate_curr(isnan(strain_rate_curr)) ...
@@ -661,9 +662,7 @@ if do_date
             end
         end
         
-        if do_interp
-            disp('...done dating overlapping layers.')
-        end
+        disp('...done dating overlapping layers.')
         
         if do_match(2)
             
@@ -692,7 +691,7 @@ if do_date
         end
         
         disp([num2str(num_layer_dated_all - num_layer_dated_old) ' dated layers added in this dating loop...'])
-        if ((num_layer_dated_all - num_layer_dated_old) <=0 )
+        if ((num_layer_dated_all - num_layer_dated_old) <= 0)
             disp('Dating loop shutting down...')
         end
         
@@ -707,11 +706,10 @@ if do_date
         switch radar_type
             case 'accum'
                 save('mat/date_all_accum', '-v7.3', 'age', 'age_core', 'age_master', 'age_match', 'age_ord', 'age_n', 'age_range', 'age_type', 'age_uncert', 'age_uncert_rel_max', 'dist_int_max', 'layer_bin')
-%                 save('mat/date_all_accum_ngrip_strain', '-v7.3', 'age', 'age_core', 'age_uncert', 'age_type', 'dist_int_max')
                 disp('Layer ages saved as mat/date_all_accum.mat.')                
             case 'deep'
                 save('mat/date_all', '-v7.3', 'age', 'age_core', 'age_master', 'age_match', 'age_ord', 'age_n', 'age_range', 'age_type', 'age_uncert', 'age_uncert_rel_max', 'dist_int_max', 'layer_bin')
-%                 save('mat/date_all_ngrip_lin', '-v7.3', 'age', 'age_core', 'age_uncert', 'age_type', 'dist_int_max')
+%                 save('mat/date_all_accum_ngrip_strain', '-v7.3', 'age', 'age_core', 'age_uncert', 'age_type', 'dist_int_max')
                 disp('Layer ages saved as mat/date_all.mat.')
         end
     end
@@ -785,7 +783,7 @@ if do_grd1
                 end
                 
                 % decimated Nye strain rate
-                if strcmp(interp_type, 'strain')
+                if strcmp(interp_type, 'quasi Nye')
                     accum_curr ...
                             = interp2(x_grd, y_grd, accum, x_pk{ii}{jj}{kk}, y_pk{ii}{jj}{kk}, 'linear', NaN);
                     accum_decim ...
@@ -870,7 +868,7 @@ if do_grd1
                                     = NaN;
                         end
                         
-                    case 'strain'
+                    case 'quasi Nye'
                         
                         for ll = find(~isnan(thick_decim{ii}{jj}{kk}))
                             
