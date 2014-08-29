@@ -1,7 +1,7 @@
 function varargout          = date_strain(depth_bound, age_bound, strain_rate, depth, tol, iter_max, return_type)
 % DATE_STRAIN Date an isochrone within a bounded layer using a self-consistent intra-layer uniform vertical strain rate.
 %
-%   [AGE/DEPTH,STRAIN_RATE] = DATE_STRAIN(DEPTH_BOUND,AGE_BOUND,DEPTH/AGE,STRAIN_RATE,TOL,ITER_MAX,RETURN_TYPE)
+%   [AGE/DEPTH,STRAIN_RATE] = DATE_STRAIN(DEPTH_BOUND,AGE_BOUND,STRAIN_RATE,DEPTH/AGE,TOL,ITER_MAX,RETURN_TYPE)
 %   determines the age AGE (yr) or DEPTH (m) of the isochrone at depth
 %   DEPTH (m) or AGE (yr) within the layer sandwiched between two dated
 %   isochrones with depths DEPTH_BOUND (m) and AGE_BOUND (yr) by assuming
@@ -18,7 +18,7 @@ function varargout          = date_strain(depth_bound, age_bound, strain_rate, d
 %   Res., 117, F03022.
 %
 % Joe MacGregor (UTIG), Ed Waddington (UW)
-% Last updated: 08/04/14
+% Last updated: 08/28/14
 
 if (nargin ~= 7)
     error('date_strain:nargin', ['Number of arguments (' num2str(nargin) ') is not equal to 7.'])
@@ -63,7 +63,7 @@ while ((abs(R(depth_bound, age_bound, strain_rate)) > tol) && (ii < iter_max))
 end
 
 % age/depth of isochrone if strain rate converged; a = (-1/e) * log(1 - z/H_eff); H_eff = z_t / (1 - exp(-A_t * e)); Equations B5/7/9 of MacGregor et al. [2012, JGR]
-if (ii < iter_max)
+if ((ii < iter_max) && (depth < (depth_bound(1) / (1 - exp(-age_bound(1) * strain_rate)))))
     switch return_type
         case 'age'
             varargout{1}    = (-1 / strain_rate) * log(1 - (depth / (depth_bound(1) / (1 - exp(-age_bound(1) * strain_rate)))));
