@@ -18,7 +18,7 @@ function strain_layers(age_max, data_str, do_strain, do_fix, do_uncert, do_bad, 
 % field is used instead.
 % 
 % Joe MacGregor (UTIG), Mark Fahnestock (UAF)
-% Last updated: 08/07/14
+% Last updated: 09/14/14
 
 if ~exist('nye_fit', 'file')
     error('strain_layers:nyefit', 'Function NYE_FIT is not available within this user''s path.')
@@ -44,8 +44,8 @@ end
 if ~exist('smooth_lowess', 'file')
     error('strain_layers:smoothlowess', 'Function SMOOTH_LOWESS is not available within this user''s path.')
 end
-if ~any(nargin == [10 11])
-    error('strain_layers:nargin', ['Number of arguments (' num2str(nargin) ') is not 10 or 11.'])
+if ~any(nargin == [9 10 11])
+    error('strain_layers:nargin', ['Number of arguments (' num2str(nargin) ') is not 9, 10 or 11.'])
 end
 if (~ischar(data_str) || ~any(strcmp(data_str, {'deep' 'accum'})))
     error('strain_layers:data_str', 'DATA_STR is not a string equal to ''deep'' or ''accum''.')    
@@ -96,11 +96,11 @@ disp('Starting strain-rate modeling...')
 switch data_str
     case 'deep'
         load mat/xy_all name_year name_trans num_year num_trans
-        load mat/merge_all depth_smooth ind_decim ind_decim_mid ind_fence num_decim thick_decim x_gimp_pk y_gimp_pk
+        load mat/merge_all depth_smooth ind_decim ind_decim_mid ind_fence num_decim thick_decim x_pk y_pk
         load mat/date_all age age_uncert
     case 'accum'
         load mat/xy_all_accum name_year name_trans num_year num_trans
-        load mat/merge_all_accum depth_smooth ind_decim ind_decim_mid ind_fence num_decim thick_decim x_gimp_pk y_gimp_pk
+        load mat/merge_all_accum depth_smooth ind_decim ind_decim_mid ind_fence num_decim thick_decim x_pk y_pk
         load mat/date_all_accum age age_uncert
 end
 
@@ -607,9 +607,9 @@ if do_grd
                             continue
                         end
                         x_all ...
-                            = [x_all; x_gimp_pk{kk}{ll}{mm}(ind_decim{kk}{ll}{mm}(1:(end - 1)) + round(diff(ind_decim{kk}{ll}{mm}) ./ 2))']; %#ok<AGROW>
+                            = [x_all; x_pk{kk}{ll}{mm}(ind_decim{kk}{ll}{mm}(1:(end - 1)) + round(diff(ind_decim{kk}{ll}{mm}) ./ 2))']; %#ok<AGROW>
                         y_all ...
-                            = [y_all; y_gimp_pk{kk}{ll}{mm}(ind_decim{kk}{ll}{mm}(1:(end - 1)) + round(diff(ind_decim{kk}{ll}{mm}) ./ 2))']; %#ok<AGROW>
+                            = [y_all; y_pk{kk}{ll}{mm}(ind_decim{kk}{ll}{mm}(1:(end - 1)) + round(diff(ind_decim{kk}{ll}{mm}) ./ 2))']; %#ok<AGROW>
                         param_all ...
                             = [param_all; eval([strain_param{ii}{jj} '{kk}{ll}{mm}'''])]; %#ok<AGROW>
                         if do_uncert

@@ -4,7 +4,7 @@
 %   merged transect and all other merged transects.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 08/08/14
+% Last updated: 08/29/14
 
 clear
 
@@ -12,7 +12,7 @@ radar_type                  = 'deep';
 letters                     = 'a':'z';
 dir_save                    = 'mat/';
 do_xy                       = true;
-do_int                      = false;
+do_int                      = true;
 do_fence                    = false;
 dist_density                = 2.5; % maximum intersection density in km
 angle_threshold             = 2.5; % minimum intersection angle in degrees

@@ -4,7 +4,7 @@
 %   deep ice-core sites and records this position if so.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 08/15/14
+% Last updated: 09/11/14
 
 clear
 
@@ -13,7 +13,6 @@ radar_type                  = 'deep';
 do_core                     = true;
 do_save                     = false;
 plotting                    = false;
-dir_save                    = 'mat/';
 
 switch radar_type
     case 'accum'
@@ -25,7 +24,7 @@ switch radar_type
 end
 load mat/gimp_proj gimp_proj
 
-wgs84                       = almanac('earth', 'wgs84', 'meters');
+wgs84                       = wgs84Ellipsoid;
 
 %% concatenate x/y positions for each campaign
 
@@ -33,7 +32,7 @@ if do_core
     
     disp('Comparing core sites ...')
     
-    rad_threshold           = 2.5; % km
+    rad_threshold           = 3; % km
     
     name_core               = {'Camp Century' 'DYE-3' 'GISP2' 'GRIP' 'NEEM' 'NorthGRIP'};
     name_core_short         = {'century' 'dye3' 'gisp2' 'grip' 'neem' 'ngrip'};
@@ -64,7 +63,7 @@ if do_core
                             = projinv(gimp_proj, (1e3 .* x{ii}{jj}), (1e3 .* y{ii}{jj}));
             
             for kk = 1:num_core
-                [tmp1, tmp2]= min(1e-3 .* distance([lat_core(kk(ones(length(x{ii}{jj}), 1)))' lon_core(kk(ones(length(x{ii}{jj}), 1)))'], [lat_curr' lon_curr'], wgs84));
+                [tmp1, tmp2]= min(1e-3 .* distance([lat_core(kk(ones(length(x{ii}{jj}), 1)))' lon_core(kk(ones(length(x{ii}{jj}), 1)))'], [lat_curr' lon_curr'], wgs84Ellipsoid));
                 if (tmp1 < rad_threshold)
                     int_core{ii}{jj} ...
                             = [int_core{ii}{jj}; tmp1 tmp2 kk x{ii}{jj}(tmp2) y{ii}{jj}(tmp2)];
@@ -79,7 +78,7 @@ if do_core
                             = projinv(gimp_proj, (1e3 .* x_pk{ii}{jj}{kk}), (1e3 .* y_pk{ii}{jj}{kk}));
                 for ll = 1:num_core
                     [tmp1, tmp2] ...
-                            = min(1e-3 .* distance([lat_core(ll(ones(length(x_pk{ii}{jj}{kk}), 1)))' lon_core(ll(ones(length(x_pk{ii}{jj}{kk}), 1)))'], [lat_merge_curr' lon_merge_curr'], wgs84));
+                            = min(1e-3 .* distance([lat_core(ll(ones(length(x_pk{ii}{jj}{kk}), 1)))' lon_core(ll(ones(length(x_pk{ii}{jj}{kk}), 1)))'], [lat_merge_curr' lon_merge_curr'], wgs84Ellipsoid));
                     if (tmp1 < rad_threshold)
                         int_core_merge ...
                             = [int_core_merge; ii jj kk ll tmp2]; %#ok<AGROW>
@@ -97,15 +96,15 @@ if do_core
             case 'deep'
                 save mat/core_int -v7.3 int_core int_core_mat int_core_merge lat_core lon_core name_core name_core_short name_trans num_core num_trans num_year rad_threshold x_core y_core
         end
-        disp(['Done comparing transects to core sites and saved results in ' dir_save '.'])
+        disp('Done comparing transects to core sites and saved results in mat/.')
     end
     
 else
     switch radar_type
         case 'accum'
-            load([dir_save 'core_int_accum'])
+            load mat/core_int_accum
         case 'deep'
-            load([dir_save 'core_int'])
+            load mat/core_int
     end
     disp(['Loaded core intersections from ' dir_save '.'])
 end

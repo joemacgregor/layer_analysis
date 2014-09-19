@@ -1,9 +1,9 @@
 % TRAVERSE_MERGE Extract merged layer data from melt/icebridge/data/.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 08/11/14
+% Last updated: 09/19/14
 
-clear all
+clear
 
 radar_type                  = 'deep';
 
@@ -20,7 +20,7 @@ letters                     = 'a':'z';
 dist_int_decim              = 1; % decimation index distance, km
 
 % initializations
-[depth_smooth, dist, elev_air_gimp, elev_bed_gimp, elev_smooth_gimp, elev_surf_gimp, file_block, ind_decim, ind_decim_mid, ind_fence, ind_layer, ind_trace_start, int_bed, int_smooth, int_surf, num_decim, num_fence, num_layer, num_trace_tot, thick, thick_decim, twtt_surf, x_pk, y_pk] ...
+[depth_smooth, dist, elev_air_gimp, elev_bed_gimp, elev_smooth_gimp, elev_surf_gimp, file_block, ind_decim, ind_decim_mid, ind_fence, ind_layer, ind_trace_start, int_bed, int_smooth, int_surf, num_decim, num_fence, num_layer, num_trace_tot, thick, thick_decim, time, twtt_surf, x_pk, y_pk] ...
                             = deal(cell(1, num_year));
 
 disp('Collecting all merged picks files...')
@@ -31,7 +31,7 @@ for ii = 1:num_year
     disp(['Campaign: ' name_year{ii} '...'])
     
     [depth_smooth{ii}, dist{ii}, elev_air_gimp{ii}, elev_bed_gimp{ii}, elev_smooth_gimp{ii}, elev_surf_gimp{ii}, file_block{ii}, ind_decim{ii}, ind_decim_mid{ii}, ind_fence{ii}, ind_layer{ii}, ind_trace_start{ii}, int_bed{ii}, int_smooth{ii}, int_surf{ii}, num_decim{ii}, num_layer{ii}, ...
-     num_trace_tot{ii}, thick{ii}, thick_decim{ii}, twtt_surf{ii}, x_pk{ii}, y_pk{ii}] ...
+     num_trace_tot{ii}, thick{ii}, thick_decim{ii}, time{ii}, twtt_surf{ii}, x_pk{ii}, y_pk{ii}] ...
                             = deal(cell(1, num_trans(ii)));
     num_fence{ii}           = deal(zeros(1, num_trans(ii)));
     
@@ -45,8 +45,8 @@ for ii = 1:num_year
             disp(['Transect: ' name_trans{ii}{jj} '...'])
             
             [depth_smooth{ii}{jj}{1}, dist{ii}{jj}{1}, elev_air_gimp{ii}{jj}{1}, elev_bed_gimp{ii}{jj}{1}, elev_smooth_gimp{ii}{jj}{1}, elev_surf_gimp{ii}{jj}{1}, file_block{ii}{jj}{1}, ind_trace_start{ii}{jj}{1}, int_bed{ii}{jj}{1}, int_smooth{ii}{jj}{1}, int_surf{ii}{jj}{1}, ...
-             num_layer{ii}{jj}, num_trace_tot{ii}{jj}(1), twtt_surf{ii}{jj}{1}, x_pk{ii}{jj}{1}, y_pk{ii}{jj}{1}] ...
-                            = deal(pk.depth_smooth, pk.dist, pk.elev_air, pk.elev_bed_gimp, pk.elev_smooth_gimp, pk.elev_surf_gimp, pk.file_block, pk.ind_trace_start, pk.int_bed, pk.int_smooth, pk.int_surf, pk.num_layer, pk.num_trace_tot, pk.twtt_surf, pk.x, pk.y);
+             num_layer{ii}{jj}, num_trace_tot{ii}{jj}(1), time{ii}{jj}{1}, twtt_surf{ii}{jj}{1}, x_pk{ii}{jj}{1}, y_pk{ii}{jj}{1}] ...
+                            = deal(pk.depth_smooth, pk.dist, pk.elev_air, pk.elev_bed_gimp, pk.elev_smooth_gimp, pk.elev_surf_gimp, pk.file_block, pk.ind_trace_start, pk.int_bed, pk.int_smooth, pk.int_surf, pk.num_layer, pk.num_trace_tot, pk.time, pk.twtt_surf, pk.x, pk.y);
             thick{ii}{jj}{1}= elev_surf_gimp{ii}{jj}{1} - elev_bed_gimp{ii}{jj}{1};
             thick{ii}{jj}{1}(isinf(thick{ii}{jj}{1})) ...
                             = NaN;
@@ -96,8 +96,8 @@ for ii = 1:num_year
                 disp(['Transect: ' name_trans{ii}{jj} letters(kk) '...'])
                 
                 [depth_smooth{ii}{jj}{kk}, dist{ii}{jj}{kk}, elev_air_gimp{ii}{jj}{kk}, elev_bed_gimp{ii}{jj}{kk}, elev_smooth_gimp{ii}{jj}{kk}, elev_surf_gimp{ii}{jj}{kk}, file_block{ii}{jj}{kk}, ind_trace_start{ii}{jj}{kk}, int_bed{ii}{jj}{kk}, int_smooth{ii}{jj}{kk}, int_surf{ii}{jj}{kk}, ...
-                 num_layer{ii}{jj}(kk), num_trace_tot{ii}{jj}(kk), twtt_surf{ii}{jj}{kk}, x_pk{ii}{jj}{kk}, y_pk{ii}{jj}{kk}] ...
-                            = deal(pk.depth_smooth, pk.dist, pk.elev_air, pk.elev_bed_gimp, pk.elev_smooth_gimp, pk.elev_surf_gimp, pk.file_block, pk.ind_trace_start, pk.int_bed, pk.int_smooth, pk.int_surf, pk.num_layer, pk.num_trace_tot, pk.twtt_surf, pk.x, pk.y);
+                 num_layer{ii}{jj}(kk), num_trace_tot{ii}{jj}(kk), time{ii}{jj}{kk}, twtt_surf{ii}{jj}{kk}, x_pk{ii}{jj}{kk}, y_pk{ii}{jj}{kk}] ...
+                            = deal(pk.depth_smooth, pk.dist, pk.elev_air, pk.elev_bed_gimp, pk.elev_smooth_gimp, pk.elev_surf_gimp, pk.file_block, pk.ind_trace_start, pk.int_bed, pk.int_smooth, pk.int_surf, pk.num_layer, pk.num_trace_tot, pk.time, pk.twtt_surf, pk.x, pk.y);
                 thick{ii}{jj}{kk} ...
                             = elev_surf_gimp{ii}{jj}{kk} - elev_bed_gimp{ii}{jj}{kk};
                 thick{ii}{jj}{kk}(isinf(thick{ii}{jj}{kk})) ...
@@ -146,10 +146,10 @@ disp('Saving merged data...')
 switch radar_type
     case 'accum'
         save('mat/merge_all_accum', '-v7.3', 'depth_smooth', 'dist', 'elev_air_gimp', 'elev_bed_gimp', 'elev_smooth_gimp', 'elev_surf_gimp', 'file_block', 'ind_decim', 'ind_decim_mid', 'ind_fence', 'ind_layer', 'ind_trace_start', 'int_bed', 'int_smooth', 'int_surf', 'num_decim', 'num_fence', ...
-                                             'num_layer', 'num_trace_tot', 'thick', 'thick_decim', 'twtt_surf', 'x_pk', 'y_pk')
+                                             'num_layer', 'num_trace_tot', 'thick', 'thick_decim', 'time', 'twtt_surf', 'x_pk', 'y_pk')
         disp('Saved merged data in mat/merge_all_accum.mat.')
     case 'deep'
-        save('mat/merge_all', '-v7.3', 'depth_smooth', 'dist', 'elev_air_gimp', 'elev_bed_gimp', 'elev_smooth_gimp', 'elev_surf_gimp', 'file_block', 'ind_decim', 'ind_decim_mid', 'ind_fence', 'ind_layer', 'ind_trace_start', 'int_bed', 'int_smooth', 'int_surf', 'num_decim', 'num_fence', 'num_layer', ...
-            'num_trace_tot', 'thick', 'thick_decim', 'twtt_surf', 'x_pk', 'y_pk')
+        save('mat/merge_all', '-v7.3', 'depth_smooth', 'dist', 'elev_air_gimp', 'elev_bed_gimp', 'elev_smooth_gimp', 'elev_surf_gimp', 'file_block', 'ind_decim', 'ind_decim_mid', 'ind_fence', 'ind_layer', 'ind_trace_start', 'int_bed', 'int_smooth', 'int_surf', 'num_decim', 'num_fence', ...
+                                       'num_layer', 'num_trace_tot', 'thick', 'thick_decim', 'time', 'twtt_surf', 'x_pk', 'y_pk')
         disp('Saved merged data in mat/merge_all.mat.')
 end

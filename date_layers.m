@@ -1,7 +1,7 @@
 % DATE_LAYERS Date layers using ice-core depth/age scales and 1D/2D interpolation/extrapolation or quasi-Nye dating of overlapping dated layers.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 08/18/14
+% Last updated: 09/15/14
 
 clear
 
@@ -16,7 +16,7 @@ switch radar_type
         do_match            = [true true];
         do_interp           = true;
         interp_type         = 'quasi Nye';
-        do_save             = false;
+        do_save             = true;
         do_grd1             = false;
         do_grd2             = false;
         do_nye_norm         = false;
@@ -27,15 +27,16 @@ switch radar_type
         do_match            = [true true];
         do_interp           = true;
         interp_type         = 'quasi Nye';
-        do_save             = true;
-        do_grd1             = true;
+        do_save             = false;
+        do_grd1             = false;
         do_grd2             = true;
-        do_nye_norm         = true;
+        do_nye_norm         = false;
 end
 
 % variables of interest
 switch radar_type
     case 'accum'
+        depth_uncert        = 5; % depth uncertainty representing unknown firn correction, m
         age_uncert_rel_max  = 0.1; % maximum relative age uncertainty
         dist_int_max        = 0.25; % km, +/- range to extract core-intersecting layer depths
         thick_diff_max      = 0.05; % fraction of ice thickness within which overlapping layer must lie
@@ -47,11 +48,14 @@ switch radar_type
         layer_diff_max_iso  = 1; % fraction of layer thickness within which overlapping layer must lie (for age_norm1 and depth_iso1)
         age_diff_max_iso    = 5e2; % age range within which layer must exist (for depth_iso1)
         snr_ref             = 10 ^ (5 / 10); % linear ratio (5 is dB), reference SNR value if unknown
+        depth_shallow_min   = 0.02; % minimum fraction of ice thickness to attempt shallow fitting
         depth_shallow_max   = 0.05; % maximum fraction of ice thickness to attempt shallow fitting
         num_date_loop_max   = 10; % maximum number of dating loops
         age_max             = 1e4; % maximum permitted reflector age
         year_ord            = [1 2 3]; % order in which to analyze years/campaigns based on their overall data quality
+        num_gauss           = ones(1, 3);
     case 'deep'
+        depth_uncert        = 10; % depth uncertainty representing unknown firn correction, m
         age_uncert_rel_max  = 0.25; % maximum relative age uncertainty
         dist_int_max        = 0.25; % km, +/- range to extract core-intersecting layer depths
         thick_diff_max      = 0.2; % fraction of ice thickness within which overlapping layer must lie
@@ -63,33 +67,43 @@ switch radar_type
         layer_diff_max_iso  = 1; % fraction of layer thickness within which overlapping layer must lie (for age_norm1 and depth_iso1)
         age_diff_max_iso    = 5e3; % age range within which layer must exist (for depth_iso1)
         snr_ref             = 10 ^ (5 / 10); % linear ratio (5 is dB), reference SNR value if unknown
+        depth_shallow_min   = 0.03; % minimum fraction of ice thickness to attempt shallow fitting
         depth_shallow_max   = 0.2; % maximum fraction of ice thickness to attempt shallow fitting
         num_date_loop_max   = 10; % maximum number of dating loops
-        age_max             = 1.5e5; % maximum permitted reflector age
+        age_max             = 1.5e5; % maximum permitted reflector age, a
         year_ord            = [17 19 20 6 7 8 4 9 5 2 3 12 1 13 15 16 18 11 10 14]; % order in which to analyze years/campaigns based on their overall data quality
+        num_gauss           = [ones(1, 15) (2 .* ones(1, 8)) 1]; % number of Gaussians to use to fit Nye differences of normalized ages
+        core_avail          = true(1, 6);
+%         core_avail          = [false(1, 5) true];
 end
 
-core_avail                  = true(1, 6);
-core_uncert_avail           = [false(1, 2) true(1, 4)]; % only GRIP, GISP2, NEEM and NGRIP have formal uncertainty
-% core_avail                  = [false(1, 5) true];
-% core_uncert_avail           = [false(1, 5) true];
+if strcmp(interp_type, 'quasi Nye')
+    tol                     = 1e-2; % residual tolerance in m
+    iter_max                = 100; % maximum number of iterations in search of best-fit strain rate
+else
+    [tol, iter_max]         = deal([]);
+end
 
 % load transect data and core intersection data
 switch radar_type
     case 'accum'
         load mat/xy_all_accum num_year num_trans name_year name_trans
-        load mat/core_int_accum int_core num_core name_core_short rad_threshold
-        load mat/id_layer_master__accum_stable id_layer_master_mat
+        load mat/core_int_accum int_core_merge num_core name_core_short
+        load mat/id_layer_master_accum_stable id_layer_master_mat
         load mat/merge_all_accum depth_smooth dist ind_decim ind_decim_mid ind_fence num_decim num_fence num_layer num_trace_tot thick thick_decim x_pk y_pk
         load mat/range_resolution_accum range_resolution
     case 'deep'
         load mat/xy_all num_year num_trans name_year name_trans
-        load mat/core_int int_core num_core name_core_short rad_threshold
+        load mat/core_int int_core_merge num_core name_core_short
         load mat/id_layer_master_stable id_layer_master_mat
         load mat/merge_all depth_smooth dist ind_decim ind_decim_mid ind_fence num_decim num_fence num_layer num_trace_tot thick thick_decim x_pk y_pk
         load mat/range_resolution range_resolution
 end
-load mat/greenland_bed_v3 elev_surf elev_bed mask_greenland mask_gris x y
+thick_trans                 = thick;
+load mat/greenland_bed_v3 thick x y
+thick_grd                   = thick;
+thick                       = thick_trans;
+clear thick_trans
 
 % do not permit matches between campaigns at far end of period from each other, i.e., ICORDS cannot be matched with MCoRDSv2
 year_match                  = true(num_year);
@@ -122,14 +136,13 @@ core                        = cell(1, num_core);
 for ii = 1:num_core
     core{ii}                = load(['mat/depth_age/' name_core_short{ii} '_depth_age']);
     if isnan(core{ii}.age(end))
-        [core{ii}.age, core{ii}.depth] ...
-                            = deal(core{ii}.age(1:(end - 1)), core{ii}.depth(1:(end - 1)));
-        if core_uncert_avail(ii)
-            core{ii}.age_uncert ...
-                            = core{ii}.age_uncert(1:(end - 1));
-        end
+        [core{ii}.age, core{ii}.age_uncert, core{ii}.depth] ...
+                            = deal(core{ii}.age(1:(end - 1)), core{ii}.age_uncert(1:(end - 1)), core{ii}.depth(1:(end - 1)));
     end
 end
+
+% index of NorthGRIP core
+ind_ngrip                   = find(strcmp(name_core_short, 'ngrip'));
 
 % dummy letters
 letters                     = 'a':'z';
@@ -137,34 +150,19 @@ letters                     = 'a':'z';
 [x_grd, y_grd]              = deal(x, y);
 clear x y
 
-% clean up bed and surface
-[elev_bed_grd, elev_surf_grd] ...
-                            = deal(elev_bed, elev_surf);
-elev_bed_grd(~mask_greenland) ...
-                            = NaN;
-elev_surf_grd(~mask_greenland | ~mask_gris) ...
-                            = NaN;
-clear elev_bed elev_surf mask_greenland mask_gris
-
 % Greenland-centered, GIMP-projected 1-km grid
 [x_min, x_max, y_min, y_max]= deal(-632, 846, -3344, -670);
-[elev_bed_grd, elev_surf_grd] ...
-                            = deal(elev_bed_grd(((y_grd(:, 1) >= y_min) & (y_grd(:, 1) <= y_max)), ((x_grd(1, :) >= x_min) & (x_grd(1, :) <= x_max))), elev_surf_grd(((y_grd(:, 1) >= y_min) & (y_grd(:, 1) <= y_max)), ((x_grd(1, :) >= x_min) & (x_grd(1, :) <= x_max))));
+thick_grd                   = thick_grd(((y_grd(:, 1) >= y_min) & (y_grd(:, 1) <= y_max)), ((x_grd(1, :) >= x_min) & (x_grd(1, :) <= x_max)));
 [x_tmp, y_tmp]              = deal(x_grd(((y_grd(:, 1) >= y_min) & (y_grd(:, 1) <= y_max)), ((x_grd(1, :) >= x_min) & (x_grd(1, :) <= x_max))), y_grd(((y_grd(:, 1) >= y_min) & (y_grd(:, 1) <= y_max)), ((x_grd(1, :) >= x_min) & (x_grd(1, :) <= x_max))));
 [x_grd, y_grd]              = deal(x_tmp, y_tmp);
 clear x_tmp y_tmp
-thick_grd                   = elev_surf_grd - elev_bed_grd;
 
-if strcmp(interp_type, 'quasi Nye')
+if (do_grd1 || (do_grd2 && do_nye_norm))
     load mat/greenland_cism accum x y
     [accum, x_cism, y_cism] = deal(double(accum), x, y);
     clear x y
     accum                   = accum(((y_cism(:, 1) >= y_min) & (y_cism(:, 1) <= y_max)), ((x_cism(1, :) >= x_min) & (x_cism(1, :) <= x_max)));
     clear x_cism y_cism
-    tol                     = 1e-2; % residual tolerance in m
-    iter_max                = 100;
-else
-    [tol, iter_max]         = deal([]);
 end
 
 % layer signal-to-noise ratio
@@ -403,7 +401,7 @@ if do_date
     % initialize master age list
     num_master              = length(layer_bin);
     age_master              = NaN(num_master, (num_core + 6));
-        
+    
 %% 
     
     disp('Dating core-intersecting layers in core-intersecting transects...')
@@ -428,10 +426,10 @@ if do_date
                 
                 disp([name_trans{ii}{jj} letters(kk) '...'])
                 
-                ind_int_core= int_core_merge((ismember(int_core_merge(:, 1:3), [ii jj kk], 'rows') & core_avail(int_core_merge(:, 4))), 4:5);
+                ind_int_core= int_core_merge((ismember(int_core_merge(:, 1:3), [ii jj kk], 'rows') & core_avail(int_core_merge(:, 4))'), 4:5);
                 
                 % loop through good core intersections
-                [age_uncert_radar, age_uncert_interp] ...
+                [age_uncert_depth, age_uncert_interp, age_uncert_radar] ...
                             = deal(NaN(num_layer{ii}{jj}(kk), num_core));
                 
                 for ll = size(ind_int_core, 1)
@@ -481,7 +479,7 @@ if do_date
                         % radar-induced uncertainty (range resolution / sqrt(snr))
                         age_uncert_radar_curr ...
                             = 0.5 * sum(abs(interp1(core{ind_int_core(ll, 1)}.depth(~isnan(core{ind_int_core(ll, 1)}.age)), core{ind_int_core(ll, 1)}.age(~isnan(core{ind_int_core(ll, 1)}.age)), ...
-                                    (depth_curr(mm) + ([range_resolution(ii) -range_resolution(ii)] ./ sqrt(snr_curr))), 'linear', 'extrap') - repmat(age_core{ii}{jj}{kk}(mm, ind_int_core(ll, 1)), 1, 2)));
+                                                    (depth_curr(mm) + ([range_resolution(ii) -range_resolution(ii)] ./ sqrt(snr_curr))), 'linear', 'extrap') - repmat(age_core{ii}{jj}{kk}(mm, ind_int_core(ll, 1)), 1, 2)));
                         if isnan(age_uncert_radar(mm, ind_int_core(ll, 1)))
                             age_uncert_radar(mm, ind_int_core(ll, 1)) ...
                                 = age_uncert_radar_curr;
@@ -489,21 +487,29 @@ if do_date
                             age_uncert_radar(mm, ind_int_core(ll, 1)) ...
                                 = nanmean([age_uncert_radar_curr age_uncert_radar(mm, ind_int_core(ll, 1))]);
                         end
+                        
+                        % depth-induced uncertainty
+                        age_uncert_depth_curr ...
+                            = 0.5 * sum(abs(interp1(core{ind_int_core(ll, 1)}.depth(~isnan(core{ind_int_core(ll, 1)}.age)), core{ind_int_core(ll, 1)}.age(~isnan(core{ind_int_core(ll, 1)}.age)), (depth_curr(mm) + [depth_uncert -depth_uncert]), 'linear', 'extrap') - ...
+                                            repmat(age_core{ii}{jj}{kk}(mm, ind_int_core(ll, 1)), 1, 2)));
+                        if isnan(age_uncert_depth(mm, ind_int_core(ll, 1)))
+                            age_uncert_depth(mm, ind_int_core(ll, 1)) ...
+                                = age_uncert_depth_curr;
+                        else
+                            age_uncert_depth(mm, ind_int_core(ll, 1)) ...
+                                = nanmean([age_uncert_depth_curr age_uncert_depth(mm, ind_int_core(ll, 1))]);
+                        end
+                        
                     end
                     
-                    if core_uncert_avail(ind_int_core(ll, 1)) % interpolated age uncertainty at core intersection
-                        age_uncert_interp_curr ...
+                    age_uncert_interp_curr ...
                             = interp1(core{ind_int_core(ll, 1)}.depth(~isnan(core{ind_int_core(ll, 1)}.age_uncert)), core{ind_int_core(ll, 1)}.age_uncert(~isnan(core{ind_int_core(ll, 1)}.age_uncert)), depth_curr(~isnan(depth_curr)), 'linear', 'extrap');
-                    else % otherwise (NorthGRIP age uncertainty) + range resolution uncertainty
-                        age_uncert_interp_curr ...
-                            = interp1(core{6}.age, core{6}.age_uncert, age_core{ii}{jj}{kk}(~isnan(depth_curr), ind_int_core(ll, 1)), 'linear', 'extrap');
-                    end
                     if isnan(age_uncert_radar(mm, ind_int_core(ll, 1)))
                         age_uncert_interp(~isnan(depth_curr), ind_int_core(ll, 1)) ...
                             = age_uncert_interp_curr;
                     else
                         age_uncert_interp(~isnan(depth_curr), ind_int_core(ll, 1)) ...
-                            = nanmean([age_uncert_interp_curr age_uncert_interp(~isnan(depth_curr), ind_int_core(ll, 1))]);
+                            = nanmean([age_uncert_interp_curr age_uncert_interp(~isnan(depth_curr), ind_int_core(ll, 1))], 2);
                     end
                     
                     % order in which layers were dated
@@ -517,7 +523,7 @@ if do_date
                 age{ii}{jj}{kk} ...
                             = nanmean(age_core{ii}{jj}{kk}, 2);
                 age_uncert{ii}{jj}{kk} ...
-                            = sqrt(nanmean((age_uncert_interp .^ 2), 2) + nanmean((age_uncert_radar .^ 2), 2)); % RSS of core age uncertainty and range resolution
+                            = sqrt(nanmean((age_uncert_interp .^ 2), 2) + nanmean((age_uncert_radar .^ 2), 2) + nanmean((age_uncert_depth .^ 2), 2)); % RSS of core age uncertainty, range resolution and depth uncertainty
                 age_n{ii}{jj}{kk}(~isnan(age{ii}{jj}{kk})) ...
                             = 1;
                 age_range{ii}{jj}{kk} ...
@@ -607,17 +613,6 @@ if do_date
                     age_old{ii}{jj}{kk} ...
                             = age{ii}{jj}{kk};
                     
-                    % Nye strain rate to initialize strain dating
-                    if strcmp(interp_type, 'quasi Nye')
-                        strain_rate_curr ...
-                            = double(interp2(x_grd, y_grd, accum, x_pk{ii}{jj}{kk}, y_pk{ii}{jj}{kk}, 'linear', NaN) ./ thick{ii}{jj}{kk});
-                        strain_rate_curr(isnan(strain_rate_curr)) ...
-                            = nanmean(strain_rate_curr);
-                    else
-                        strain_rate_curr ...
-                            = [];
-                    end
-                    
                     % initial list of undated reflectors
                     [ind_layer_undated, ind_layer_undated_ref] ...
                             = deal(find(isnan(age{ii}{jj}{kk}))');
@@ -638,7 +633,7 @@ if do_date
                         while any(isnan(age{ii}{jj}{kk}(setdiff(ind_layer_undated, ind_layer_blacklist))))
                             [age{ii}{jj}{kk}, age_ord{ii}{jj}{kk}, age_n{ii}{jj}{kk}, age_range{ii}{jj}{kk}, age_type{ii}{jj}{kk}, age_uncert{ii}{jj}{kk}, date_counter, ind_layer_blacklist] ...
                                 = date_interp(depth_smooth{ii}{jj}{kk}, thick{ii}{jj}{kk}, age{ii}{jj}{kk}, age_ord{ii}{jj}{kk}, age_n{ii}{jj}{kk}, age_range{ii}{jj}{kk}, age_type{ii}{jj}{kk}, age_uncert{ii}{jj}{kk}, num_layer{ii}{jj}(kk), ind_layer_undated, ind_layer_blacklist, ...
-                                              curr_name, interp_type, parallel_check, num_pool, date_counter, strain_rate_curr, age_uncert_rel_max, thick_diff_max, layer_diff_max, tol, iter_max, age_max, do_age_check, num_date_loop);
+                                              thick_diff_max, layer_diff_max, curr_name, interp_type, parallel_check, num_pool, tol, iter_max, age_max, do_age_check, age_uncert_rel_max, date_counter, (num_date_loop + 1));
                         end
                         
                         % updated undated layer set
@@ -652,8 +647,8 @@ if do_date
                     % shallow quasi-Nye using surface as a last resort, if possible
                     for ll = find(isnan(age{ii}{jj}{kk}))'
                         [age{ii}{jj}{kk}, age_ord{ii}{jj}{kk}, age_n{ii}{jj}{kk}, age_range{ii}{jj}{kk}, age_type{ii}{jj}{kk}, age_uncert{ii}{jj}{kk}, date_counter] ...
-                            = date_interp_shallow(depth_smooth{ii}{jj}{kk}, thick{ii}{jj}{kk}, age{ii}{jj}{kk}, age_ord{ii}{jj}{kk}, age_n{ii}{jj}{kk}, age_range{ii}{jj}{kk}, age_type{ii}{jj}{kk}, age_uncert{ii}{jj}{kk}, interp_type, date_counter, ll, age_uncert_rel_max, depth_shallow_max, ...
-                                                  age_max, do_age_check, curr_name, (num_date_loop + 0.25));
+                            = date_interp_shallow(depth_smooth{ii}{jj}{kk}, thick{ii}{jj}{kk}, age{ii}{jj}{kk}, age_ord{ii}{jj}{kk}, age_n{ii}{jj}{kk}, age_range{ii}{jj}{kk}, age_type{ii}{jj}{kk}, age_uncert{ii}{jj}{kk}, interp_type, date_counter, ll, age_uncert_rel_max, depth_shallow_min, ...
+                                                  depth_shallow_max, age_max, do_age_check, curr_name, (num_date_loop + 1.25));
                     end
                     
                     % display number of additional layers that were dated
@@ -669,7 +664,7 @@ if do_date
             disp('Assigning ages to matched layers...')
             
             [age_master, age_core, age, age_uncert, age_range, age_n, age_type, age_ord, date_counter] ...
-                            = match_age(find(isnan(age_master(:, (num_core + 1))))', layer_bin, num_core, age_master, age_core, age, age_uncert, age_range, age_n, age_type, age_ord, date_counter, false, (num_date_loop + 0.25), (num_date_loop + [0.5 0.75]), do_age_check, name_trans, letters, ...
+                            = match_age(find(isnan(age_master(:, (num_core + 1))))', layer_bin, num_core, age_master, age_core, age, age_uncert, age_range, age_n, age_type, age_ord, date_counter, false, (num_date_loop + 1.25), (num_date_loop + [1.5 1.75]), do_age_check, name_trans, letters, ...
                                         depth_smooth);
             
             disp('...done assigning ages to matched layers.')
@@ -706,10 +701,10 @@ if do_date
         switch radar_type
             case 'accum'
                 save('mat/date_all_accum', '-v7.3', 'age', 'age_core', 'age_master', 'age_match', 'age_ord', 'age_n', 'age_range', 'age_type', 'age_uncert', 'age_uncert_rel_max', 'dist_int_max', 'layer_bin')
-                disp('Layer ages saved as mat/date_all_accum.mat.')                
+                disp('Layer ages saved as mat/date_all_accum.mat.')
             case 'deep'
-                save('mat/date_all', '-v7.3', 'age', 'age_core', 'age_master', 'age_match', 'age_ord', 'age_n', 'age_range', 'age_type', 'age_uncert', 'age_uncert_rel_max', 'dist_int_max', 'layer_bin')
-%                 save('mat/date_all_accum_ngrip_strain', '-v7.3', 'age', 'age_core', 'age_uncert', 'age_type', 'dist_int_max')
+%                 save('mat/date_all', '-v7.3', 'age', 'age_core', 'age_master', 'age_match', 'age_ord', 'age_n', 'age_range', 'age_type', 'age_uncert', 'age_uncert_rel_max', 'dist_int_max', 'layer_bin')
+                save('mat/date_all_ngrip_qnye', '-v7.3', 'age', 'age_core', 'age_uncert', 'age_type', 'dist_int_max')
                 disp('Layer ages saved as mat/date_all.mat.')
         end
     end
@@ -732,7 +727,7 @@ end
 %%
 if do_grd1
     
-    disp('1-D gridding age...')
+    disp('1-D inter/extrapolation of age at normalized depths and depth at specified ages...')
     
     % decimation
     if logical(num_depth_norm)
@@ -741,12 +736,12 @@ if do_grd1
         depth_norm          = 0;
     end
     
-    [age_diff1, age_norm1, age_uncert_norm1, depth_iso1, depth_norm_grd1, dist_grd1] ...
+    [age_diff1, age_norm1, age_uncert_norm1, depth_iso1, depth_norm_grd1, depth_uncert_iso1, dist_grd1] ...
                             = deal(cell(1, num_year));
     
     for ii = 1:num_year
         
-        [age_diff1{ii}, age_norm1{ii}, age_uncert_norm1{ii}, depth_iso1{ii}, depth_norm_grd1{ii}, dist_grd1{ii}] ...
+        [age_diff1{ii}, age_norm1{ii}, age_uncert_norm1{ii}, depth_iso1{ii}, depth_norm_grd1{ii}, depth_uncert_iso1{ii}, dist_grd1{ii}] ...
                             = deal(cell(1, num_trans(ii)));
         
         disp(['Campaign: ' name_year{ii} '...'])
@@ -754,7 +749,7 @@ if do_grd1
         % loop through merged picks file that have been analyzed through FENCEGUI
         for jj = 1:num_trans(ii)
             
-            [age_diff1{ii}{jj}, age_norm1{ii}{jj}, age_uncert_norm1{ii}{jj}, depth_iso1{ii}{jj}, depth_norm_grd1{ii}{jj}, dist_grd1{ii}{jj}] ...
+            [age_diff1{ii}{jj}, age_norm1{ii}{jj}, age_uncert_norm1{ii}{jj}, depth_iso1{ii}{jj}, depth_norm_grd1{ii}{jj}, depth_uncert_iso1{ii}{jj}, dist_grd1{ii}{jj}] ...
                             = deal(cell(1, length(ind_fence{ii}{jj})));
             
             % loop through all merged picks file for current transect
@@ -797,7 +792,7 @@ if do_grd1
                     strain_rate_decim(isnan(strain_rate_decim) | isinf(strain_rate_decim)) ...
                             = nanmean(strain_rate_decim(~isinf(strain_rate_decim)));
                 end
-                                
+                
                 % thickness-normalized layer depths
                 depth_smooth_norm ...
                             = depth_smooth_decim ./ repmat(thick_decim{ii}{jj}{kk}, length(ind_layer_dated), 1);
@@ -812,10 +807,10 @@ if do_grd1
                 
                 [age_norm1{ii}{jj}{kk}, age_uncert_norm1{ii}{jj}{kk}] ...
                             = deal(NaN(num_depth_norm, num_decim{ii}{jj}(kk)));
-                depth_iso1{ii}{jj}{kk} ...
-                            = NaN(num_age_iso, num_decim{ii}{jj}(kk));
+                [depth_iso1{ii}{jj}{kk}, depth_uncert_iso1{ii}{jj}{kk}] ...
+                            = deal(NaN(num_age_iso, num_decim{ii}{jj}(kk)));
                 
-                % do age uncertainties first
+                % do age and depth uncertainties first
                 for ll = find(~isnan(thick_decim{ii}{jj}{kk}))
                     if ~thick_decim{ii}{jj}{kk}(ll)
                         continue
@@ -829,15 +824,22 @@ if do_grd1
                             = age_uncert_dated(~isnan(depth_smooth_norm(:, ll)));
                     age_uncert_norm1{ii}{jj}{kk}(:, ll) ...
                             = interp1(tmp1, age_uncert_curr(tmp2), depth_norm, 'linear', 'extrap');
-                end
+                    [tmp1, tmp2] ...
+                            = unique(age_dated);
+                    depth_uncert_curr ...
+                            = nanmean(diff(core{ind_ngrip}.depth(interp1(core{ind_ngrip}.age, 1:length(core{ind_ngrip}.age), [(age_dated - age_uncert_dated) age_dated (age_dated + age_uncert_dated)], 'nearest', 'extrap')), 1, 2), 2);
+                    depth_uncert_iso1{ii}{jj}{kk}(:, ll) ...
+                            = interp1(tmp1, depth_uncert_curr(tmp2), age_iso, 'linear', 'extrap');
+               end
                 
                 % loop through each decimated trace and calculate 1D vertical age profile at uniform horizontal intervals in along-transect grid
                 switch interp_type
                     
-                    case 'lin'
+                    case 'linear'
                         
                         for ll = find(~isnan(thick_decim{ii}{jj}{kk}))
                             
+                            % skip if zero thickness or not enough dated layers
                             if ~thick_decim{ii}{jj}{kk}(ll)
                                 continue
                             end
@@ -848,6 +850,7 @@ if do_grd1
                             [tmp1, tmp2] ...
                                 = unique(depth_smooth_norm(~isnan(depth_smooth_norm(:, ll)), ll));
                             
+                            % linearly interpolate age at normalized depths
                             if logical(num_depth_norm)
                                 age_curr ...
                                     = age_dated(~isnan(depth_smooth_norm(:, ll)));
@@ -855,6 +858,7 @@ if do_grd1
                                     = interp1(tmp1, age_curr(tmp2), depth_norm, 'linear', 'extrap');
                             end
                             
+                            % linearly interpolate depth at specified ages
                             [tmp1, tmp2] ...
                                 = unique(age_dated(~isnan(depth_smooth_decim(:, ll))));
                             if (length(tmp1) > 1)
@@ -917,19 +921,13 @@ if do_grd1
                                 % quasi-Nye age
                                 if (~isempty(depth_bound) && ~isempty(age_bound) && (diff(depth_bound) > 0) && (diff(age_bound) > 0))
                                     age_norm1{ii}{jj}{kk}(mm, ll) ...
-                                        = date_strain(depth_bound, age_bound, strain_rate_decim(ll), depth_curr(mm), tol, iter_max, 'age');
+                                        = date_quasi_nye(depth_bound, age_bound, (-diff(log(1 - (depth_bound ./ thick_decim{ii}{jj}{kk}(ll)))) / diff(age_bound)), depth_curr(mm), tol, iter_max, 'age');
                                     % sanity check
                                     if (((depth_curr(mm) > depth_bound(2)) && (age_norm1{ii}{jj}{kk}(mm, ll) < age_bound(2))) || ((depth_curr(mm) < depth_bound(1)) && (age_norm1{ii}{jj}{kk}(mm, ll) > age_bound(1))) || ...
                                         (((depth_curr(mm) > depth_bound(1)) && (depth_curr(mm) < depth_bound(2))) && ((age_norm1{ii}{jj}{kk}(mm, ll) < age_bound(1)) || (age_norm1{ii}{jj}{kk}(mm, ll) > age_bound(2)))))
                                         age_norm1{ii}{jj}{kk}(mm, ll) ...
                                             = NaN;
                                     end
-                                end
-                                
-                                % sanity check
-                                if ~isreal(age_norm1{ii}{jj}{kk}(mm, ll))
-                                    age_norm1{ii}{jj}{kk}(mm, ll) ...
-                                        = NaN;
                                 end
                             end
                             
@@ -963,16 +961,12 @@ if do_grd1
                                 % quasi-Nye isochrone depth
                                 if (~isempty(depth_bound) && ~isempty(age_bound) && (diff(depth_bound) > 0) && (diff(age_bound) > 0))
                                     depth_iso1{ii}{jj}{kk}(mm, ll) ...
-                                        = date_strain(depth_bound, age_bound, strain_rate_decim(ll), age_iso(mm), tol, iter_max, 'depth');
+                                        = date_quasi_nye(depth_bound, age_bound, (-diff(log(1 - (depth_bound ./ thick_decim{ii}{jj}{kk}(ll)))) / diff(age_bound)), age_iso(mm), tol, iter_max, 'depth');
                                     if (((age_iso(mm) > age_bound(2)) && (depth_iso1{ii}{jj}{kk}(mm, ll) < depth_bound(2))) || ((age_iso(mm) < age_bound(1)) && (depth_iso1{ii}{jj}{kk}(mm, ll) > depth_bound(1))) || ...
                                         (((age_iso(mm) > age_bound(1)) && (age_iso(mm) < age_bound(2))) && ((depth_iso1{ii}{jj}{kk}(mm, ll) < depth_bound(1)) || (depth_iso1{ii}{jj}{kk}(mm, ll) > depth_bound(2)))))
                                         depth_iso1{ii}{jj}{kk}(mm, ll) ...
                                             = NaN;
                                     end
-                                end
-                                if ~isreal(depth_iso1{ii}{jj}{kk}(mm, ll))
-                                    depth_iso1{ii}{jj}{kk}(mm, ll) ...
-                                        = NaN;
                                 end
                             end
                             depth_iso1{ii}{jj}{kk}((depth_iso1{ii}{jj}{kk}(:, ll) > thick_decim{ii}{jj}{kk}(ll)), ll) ...
@@ -980,11 +974,14 @@ if do_grd1
                         end
                 end
                 
+                % NaN out misbehaving values
                 age_norm1{ii}{jj}{kk}(isinf(age_norm1{ii}{jj}{kk}) | (age_norm1{ii}{jj}{kk} < 0) | (age_norm1{ii}{jj}{kk} > age_max)) ...
                             = NaN;
                 age_uncert_norm1{ii}{jj}{kk}(isinf(age_uncert_norm1{ii}{jj}{kk}) | (age_uncert_norm1{ii}{jj}{kk} < 0)) ...
                             = NaN;
                 depth_iso1{ii}{jj}{kk}(isinf(depth_iso1{ii}{jj}{kk}) | (depth_iso1{ii}{jj}{kk} < 0)) ...
+                            = NaN;
+                depth_uncert_iso1{ii}{jj}{kk}(depth_uncert_iso1{ii}{jj}{kk} < 0) ...
                             = NaN;
                 
                 % reference Nye age field
@@ -1006,10 +1003,10 @@ if do_grd1
         disp('Saving 1-D age grids...')
         switch radar_type
             case 'accum'
-                save('mat/age_grd1_accum', '-v7.3', 'age_diff1', 'age_norm1', 'age_uncert_norm1', 'age_iso', 'depth_norm', 'depth_iso1', 'depth_norm', 'depth_norm_grd1', 'dist_grd1', 'num_age_iso', 'num_depth_norm')
+                save('mat/age_grd1_accum', '-v7.3', 'age_diff1', 'age_norm1', 'age_uncert_norm1', 'age_iso', 'depth_norm', 'depth_iso1', 'depth_norm', 'depth_norm_grd1', 'depth_uncert_iso1', 'dist_grd1', 'num_age_iso', 'num_depth_norm')
                 disp('Saved 1-D age grids as mat/age_grd1_accum.mat.')
             case 'deep'
-                save('mat/age_grd1', '-v7.3', 'age_diff1', 'age_norm1', 'age_uncert_norm1', 'age_iso', 'depth_norm', 'depth_iso1', 'depth_norm', 'depth_norm_grd1', 'dist_grd1', 'num_age_iso', 'num_depth_norm')
+                save('mat/age_grd1', '-v7.3', 'age_diff1', 'age_norm1', 'age_uncert_norm1', 'age_iso', 'depth_norm', 'depth_iso1', 'depth_norm', 'depth_norm_grd1', 'depth_uncert_iso1', 'dist_grd1', 'num_age_iso', 'num_depth_norm')
                 disp('Saved 1-D age grids as mat/age_grd1.mat.')
         end
     end
@@ -1019,13 +1016,13 @@ elseif do_grd2
     disp('Loading 1-D age gridding...')
     switch radar_type
         case 'accum'
-            load mat/age_grd1_accum age_norm1 age_uncert_norm1 depth_iso1 depth_norm num_age_iso num_depth_norm
+            load mat/age_grd1_accum age_norm1 age_uncert_norm1 depth_iso1 depth_norm depth_uncert_iso1 num_age_iso num_depth_norm
             if do_nye_norm
                 load mat/age_grd1_accum age_diff1
             end
             disp('Loaded 1-D age gridding from mat/age_grd1_accum.mat')
         case 'deep'
-            load mat/age_grd1 age_norm1 age_uncert_norm1 depth_iso1 depth_norm num_age_iso num_depth_norm
+            load mat/age_grd1 age_norm1 age_uncert_norm1 depth_iso1 depth_norm depth_uncert_iso1 num_age_iso num_depth_norm
             if do_nye_norm
                 load mat/age_grd1 age_diff1
             end
@@ -1036,21 +1033,24 @@ end
 
 if do_grd2
     
-    disp('2-D gridding normalized ages and depths...')
+    disp('2-D gridding of normalized ages, isochrone depths and their uncertainties...')
     
+    % prepare cells for ages/depths to be gridded
     [age_norm2, age_uncert_norm2] ...
-                            = deal(zeros(size(x_grd, 1), size(x_grd, 2), num_depth_norm));
-    depth_iso2              = zeros(size(x_grd, 1), size(x_grd, 2), num_age_iso);
-    [thick_cat, x_all_age_cat, x_all_age_uncert_cat, x_all_depth_cat, y_all_age_cat, y_all_age_uncert_cat, y_all_depth_cat] ...
+                            = deal(NaN(size(x_grd, 1), size(x_grd, 2), num_depth_norm));
+    [depth_iso2, depth_uncert_iso2] ...
+                            = deal(NaN(size(x_grd, 1), size(x_grd, 2), num_age_iso));
+    [thick_cat, x_all_age_cat, x_all_age_uncert_cat, x_all_depth_cat, x_all_depth_uncert_cat, y_all_age_cat, y_all_age_uncert_cat, y_all_depth_cat, y_all_depth_uncert_cat] ...
                             = deal([]);
-    [age_all, age_uncert_all, x_all_age, x_all_age_uncert, y_all_age, y_all_age_uncert] ...
+    [age_all, age_all_min, age_all_max, age_uncert_all, x_all_age, x_all_age_min, x_all_age_max, x_all_age_uncert, y_all_age, y_all_age_min, y_all_age_max, y_all_age_uncert] ...
                             = deal(cell(1, num_depth_norm));
     if do_nye_norm
         age_diff_all        = cell(1, num_depth_norm);
     end
-    [depth_all, thick_all, x_all_depth, y_all_depth] ...
+    [depth_all, depth_all_min, depth_all_max, depth_uncert_all, x_all_depth, x_all_depth_min, x_all_depth_max, x_all_depth_uncert, y_all_depth, y_all_depth_min, y_all_depth_max, y_all_depth_uncert] ...
                             = deal(cell(1, num_age_iso));
     
+    % loop through each 1-D set and add its values to the mix
     for ii = 1:num_year
         for jj = 1:num_trans(ii)
             for kk = 1:length(ind_fence{ii}{jj})
@@ -1064,6 +1064,20 @@ if do_grd2
                             age_diff_all{ll} ...
                                 = [age_diff_all{ll}; age_diff1{ii}{jj}{kk}(ll, :)'];
                         end
+                        [age_min_tmp, age_max_tmp] ...
+                            = deal(age_norm1{ii}{jj}{kk}(ll, :));
+                        for mm = find(isnan(age_norm1{ii}{jj}{kk}(ll, :)))
+                            if ~isempty(find(age_norm1{ii}{jj}{kk}(1:(ll - 1), mm), 1, 'last'))
+                                age_min_tmp(ll) ...
+                                    = age_norm1{ii}{jj}{kk}(find(age_norm1{ii}{jj}{kk}(1:(ll - 1), mm), 1, 'last'), mm);
+                            end
+                            if ~isempty(find(age_norm1{ii}{jj}{kk}((ll + 1):end, mm), 1))
+                                age_max_tmp(ll) ...
+                                    = age_norm1{ii}{jj}{kk}(find(age_norm1{ii}{jj}{kk}((ll + 1):end, mm), 1), mm);
+                            end
+                        end
+                        [age_all_min{ll}, age_all_max{ll}] ...
+                            = deal([age_all_min{ll}; age_min_tmp'], [age_all_max{ll}; age_max_tmp']);
                     end
                 end
                 if ~isempty(age_uncert_norm1{ii}{jj}{kk})
@@ -1076,20 +1090,44 @@ if do_grd2
                 end
                 if ~isempty(depth_iso1{ii}{jj}{kk})
                     [x_all_depth_cat, y_all_depth_cat, thick_cat] ...
-                            = deal([x_all_depth_cat; x_pk{ii}{jj}{kk}(ind_decim_mid{ii}{jj}{kk})'], [y_all_depth_cat; y_pk{ii}{jj}{kk}(ind_decim_mid{ii}{jj}{kk})'], [thick_cat; double(thick{ii}{jj}{kk}(ind_decim_mid{ii}{jj}{kk})')]);
+                            = deal([x_all_depth_cat; x_pk{ii}{jj}{kk}(ind_decim_mid{ii}{jj}{kk})'], [y_all_depth_cat; y_pk{ii}{jj}{kk}(ind_decim_mid{ii}{jj}{kk})'], [thick_cat; double(thick_decim{ii}{jj}{kk}')]);
                     for ll = 1:num_age_iso
                         depth_all{ll} ...
                             = [depth_all{ll}; depth_iso1{ii}{jj}{kk}(ll, :)'];
+                        [depth_min_tmp, depth_max_tmp] ...
+                                = deal(depth_iso1{ii}{jj}{kk}(ll, :));
+                        for mm = find(isnan(depth_iso1{ii}{jj}{kk}(ll, :)))
+                            if ~isempty(find(depth_iso1{ii}{jj}{kk}(1:(ll - 1), mm), 1, 'last'))
+                                depth_min_tmp(ll) ...
+                                    = depth_iso1{ii}{jj}{kk}(find(depth_iso1{ii}{jj}{kk}(1:(ll - 1), mm), 1, 'last'), mm);
+                            end
+                            if ~isempty(find(depth_iso1{ii}{jj}{kk}((ll + 1):end, mm), 1))
+                                depth_max_tmp(ll) ...
+                                    = depth_iso1{ii}{jj}{kk}(find(depth_iso1{ii}{jj}{kk}((ll + 1):end, mm), 1), mm);
+                            end
+                        end
+                        [depth_all_min{ll}, depth_all_max{ll}] ...
+                            = deal([depth_all_min{ll}; depth_min_tmp'], [depth_all_max{ll}; depth_max_tmp']);
+                    end
+                end
+                if ~isempty(depth_uncert_iso1{ii}{jj}{kk})
+                    [x_all_depth_uncert_cat, y_all_depth_uncert_cat] ...
+                            = deal([x_all_depth_uncert_cat; x_pk{ii}{jj}{kk}(ind_decim_mid{ii}{jj}{kk})'], [y_all_depth_uncert_cat; y_pk{ii}{jj}{kk}(ind_decim_mid{ii}{jj}{kk})']);
+                    for ll = 1:num_age_iso
+                        depth_uncert_all{ll} ...
+                            = [depth_uncert_all{ll}; depth_uncert_iso1{ii}{jj}{kk}(ll, :)'];
                     end
                 end
             end
         end
     end
     
-    % concatenate and remove the bad stuff
+    % concatenate and remove the bad stuff prior to gridding
     for ii = 1:num_depth_norm
-        [x_all_age{ii}, y_all_age{ii}] ...
-                            = deal(x_all_age_cat, y_all_age_cat);
+        [x_all_age{ii}, x_all_age_min{ii}, x_all_age_max{ii}] ...
+                            = deal(x_all_age_cat);
+        [y_all_age{ii}, y_all_age_min{ii}, y_all_age_max{ii}] ...
+                            = deal(y_all_age_cat);
         ind_good            = find(~isnan(age_all{ii}));
         [x_all_age{ii}, y_all_age{ii}, age_all{ii}] ...
                             = deal(x_all_age{ii}(ind_good), y_all_age{ii}(ind_good), age_all{ii}(ind_good));
@@ -1102,9 +1140,18 @@ if do_grd2
         if do_nye_norm
             age_diff_all{ii}= age_diff_all{ii}(ind_unique);
         end
-    end
-    
-    for ii = 1:num_depth_norm
+        ind_good            = find(~isnan(age_all_min{ii}));
+        [x_all_age_min{ii}, y_all_age_min{ii}, age_all_min{ii}] ...
+                            = deal(x_all_age_min{ii}(ind_good), y_all_age_min{ii}(ind_good), age_all_min{ii}(ind_good));
+        [xy_all, ind_unique]= unique([x_all_age_min{ii} y_all_age_min{ii}], 'rows');
+        [x_all_age_min{ii}, y_all_age_min{ii}, age_all_min{ii}] ...
+                            = deal(xy_all(:, 1), xy_all(:, 2), age_all_min{ii}(ind_unique));
+        ind_good            = find(~isnan(age_all_max{ii}));
+        [x_all_age_max{ii}, y_all_age_max{ii}, age_all_max{ii}] ...
+                            = deal(x_all_age_max{ii}(ind_good), y_all_age_max{ii}(ind_good), age_all_max{ii}(ind_good));
+        [xy_all, ind_unique]= unique([x_all_age_max{ii} y_all_age_max{ii}], 'rows');
+        [x_all_age_max{ii}, y_all_age_max{ii}, age_all_max{ii}] ...
+                            = deal(xy_all(:, 1), xy_all(:, 2), age_all_max{ii}(ind_unique));
         [x_all_age_uncert{ii}, y_all_age_uncert{ii}] ...
                             = deal(x_all_age_uncert_cat, y_all_age_uncert_cat);
         ind_good            = find(~isnan(age_uncert_all{ii}));
@@ -1116,44 +1163,78 @@ if do_grd2
     end
     
     for ii = 1:num_age_iso
-        [x_all_depth{ii}, y_all_depth{ii}, thick_all{ii}] ...
-                            = deal(x_all_depth_cat, y_all_depth_cat, thick_cat);
-        ind_good            = find(~isnan(depth_all{ii}) & ~isnan(thick_all{ii}));
-        [x_all_depth{ii}, y_all_depth{ii}, depth_all{ii}, thick_all{ii}] ...
-                            = deal(x_all_depth{ii}(ind_good), y_all_depth{ii}(ind_good), depth_all{ii}(ind_good), thick_all{ii}(ind_good));
+        [x_all_depth{ii}, x_all_depth_min{ii}, x_all_depth_max{ii}] ...
+                            = deal(x_all_depth_cat);
+        [y_all_depth{ii}, y_all_depth_min{ii}, y_all_depth_max{ii}] ...
+                            = deal(y_all_depth_cat);
+        [thick_all_curr, thick_all_min_curr, thick_all_max_curr] ...
+                            = deal(thick_cat);
+        ind_good            = find(~isnan(depth_all{ii}) & ~isnan(thick_all_curr));
+        [x_all_depth{ii}, y_all_depth{ii}, depth_all{ii}, thick_all_curr] ...
+                            = deal(x_all_depth{ii}(ind_good), y_all_depth{ii}(ind_good), depth_all{ii}(ind_good), thick_all_curr(ind_good));
         [xy_all, ind_unique]= unique([x_all_depth{ii} y_all_depth{ii}], 'rows', 'stable');
-        [x_all_depth{ii}, y_all_depth{ii}, depth_all{ii}, thick_all{ii}] ...
-                            = deal(xy_all(:, 1), xy_all(:, 2), depth_all{ii}(ind_unique), thick_all{ii}(ind_unique));
-        depth_all{ii}       = depth_all{ii} ./ thick_all{ii};
+        [x_all_depth{ii}, y_all_depth{ii}, depth_all{ii}, thick_all_curr] ...
+                            = deal(xy_all(:, 1), xy_all(:, 2), depth_all{ii}(ind_unique), thick_all_curr(ind_unique));
+        depth_all{ii}       = depth_all{ii} ./ thick_all_curr;
+        ind_good            = find(~isnan(depth_all_min{ii}) & ~isnan(thick_all_min_curr));
+        [x_all_depth_min{ii}, y_all_depth_min{ii}, depth_all_min{ii}, thick_all_min_curr] ...
+                            = deal(x_all_depth_min{ii}(ind_good), y_all_depth_min{ii}(ind_good), depth_all_min{ii}(ind_good), thick_all_min_curr(ind_good));
+        [xy_all, ind_unique]= unique([x_all_depth_min{ii} y_all_depth_min{ii}], 'rows', 'stable');
+        [x_all_depth_min{ii}, y_all_depth_min{ii}, depth_all_min{ii}, thick_all_min_curr] ...
+                            = deal(xy_all(:, 1), xy_all(:, 2), depth_all_min{ii}(ind_unique), thick_all_min_curr(ind_unique));
+        depth_all_min{ii}   = depth_all_min{ii} ./ thick_all_min_curr;
+        ind_good            = find(~isnan(depth_all_max{ii}) & ~isnan(thick_all_max_curr));
+        [x_all_depth_max{ii}, y_all_depth_max{ii}, depth_all_max{ii}, thick_all_max_curr] ...
+                            = deal(x_all_depth_max{ii}(ind_good), y_all_depth_max{ii}(ind_good), depth_all_max{ii}(ind_good), thick_all_max_curr(ind_good));
+        [xy_all, ind_unique]= unique([x_all_depth_max{ii} y_all_depth_max{ii}], 'rows', 'stable');
+        [x_all_depth_max{ii}, y_all_depth_max{ii}, depth_all_max{ii}, thick_all_max_curr] ...
+                            = deal(xy_all(:, 1), xy_all(:, 2), depth_all_max{ii}(ind_unique), thick_all_max_curr(ind_unique));
+        depth_all_max{ii}   = depth_all_max{ii} ./ thick_all_max_curr;
+        [x_all_depth_uncert{ii}, y_all_depth_uncert{ii}, thick_uncert_curr] ...
+                            = deal(x_all_depth_uncert_cat, y_all_depth_uncert_cat, thick_cat);
+        ind_good            = find(~isnan(depth_uncert_all{ii}) & ~isnan(thick_uncert_curr));
+        [x_all_depth_uncert{ii}, y_all_depth_uncert{ii}, depth_uncert_all{ii}, thick_uncert_curr] ...
+                            = deal(x_all_depth_uncert{ii}(ind_good), y_all_depth_uncert{ii}(ind_good), depth_uncert_all{ii}(ind_good), thick_uncert_curr(ind_good));
+        [xy_all, ind_unique]= unique([x_all_depth_uncert{ii} y_all_depth_uncert{ii}], 'rows', 'stable');
+        [x_all_depth_uncert{ii}, y_all_depth_uncert{ii}, depth_uncert_all{ii}, thick_uncert_curr] ...
+                            = deal(xy_all(:, 1), xy_all(:, 2), depth_uncert_all{ii}(ind_unique), thick_uncert_curr(ind_unique));
+        depth_uncert_all{ii}= depth_uncert_all{ii} ./ thick_uncert_curr;
     end
     
     clear *_cat
     
-    % use Nye normalization and Gaussian fits to remove 3-sigma anomalies from gridded set
+    % use Nye normalization and Gaussian fits to remove major anomalies from age_norm1 sets to be gridded
     if do_nye_norm
-        num_gauss           = [ones(1, 15) (2 .* ones(1, 8)) 1];
         for ii = 1:(num_depth_norm - 1)
-            fit_curr        = fit((min(age_diff_all{ii}):0.1:max(age_diff_all{ii}))', hist(age_diff_all{ii}, min(age_diff_all{ii}):0.1:max(age_diff_all{ii}))', ['gauss' num2str(num_gauss(ii))]);
+            fit_curr        = fit((min(age_diff_all{ii}):0.1:max(age_diff_all{ii}))', hist(age_diff_all{ii}, min(age_diff_all{ii}):0.1:max(age_diff_all{ii}))', ['gauss' num2str(num_gauss(ii))]); % Gaussian fit to histogran of age differences from Nye model
             switch num_gauss(ii)
                 case 1
                     age_diff_range ...
-                            = norminv([0.05 0.975], fit_curr.b1, fit_curr.c1);
+                            = norminv([0.05 0.99], fit_curr.b1, fit_curr.c1); % lower/upper bounds of acceptable Nye differences
                 case 2
                     age_diff_range ...
                             = zeros(2);
                     age_diff_range(1, :) ...
-                            = norminv([0.05 0.975], fit_curr.b1, fit_curr.c1);
+                            = norminv([0.05 0.99], fit_curr.b1, fit_curr.c1);
                     age_diff_range(2, :) ...
-                            = norminv([0.05 0.975], fit_curr.b2, fit_curr.c2);
+                            = norminv([0.05 0.99], fit_curr.b2, fit_curr.c2);
                     age_diff_range ...
-                            = [min(age_diff_range(:, 1)) max(age_diff_range(:, 2))];
+                            = [min(age_diff_range(:, 1)) max(age_diff_range(:, 2))]; % take min/max of the two fits' lower/upper bounds, respectively
             end
-            ind_good        = find((age_diff_all{ii} >= age_diff_range(1)) & (age_diff_all{ii} <= age_diff_range(2)));
+            ind_good        = find((age_diff_all{ii} >= age_diff_range(1)) & (age_diff_all{ii} <= age_diff_range(2))); % indices of ages with Nye differences within spec
             [x_all_age{ii}, y_all_age{ii}, age_all{ii}, age_diff_all{ii}] ...
                             = deal(x_all_age{ii}(ind_good), y_all_age{ii}(ind_good), age_all{ii}(ind_good), age_diff_all{ii}(ind_good));
+            [xy_all, ~, ind_common] ...
+                            = intersect([x_all_age{ii} y_all_age{ii}], [x_all_age_min{ii} y_all_age_min{ii}], 'rows', 'stable');
+            [x_all_age_min{ii}, y_all_age_min{ii}, age_all_min{ii}] ...
+                            = deal(xy_all(:, 1), xy_all(:, 2), age_all_min{ii}(ind_common));
+            [xy_all, ~, ind_common] ...
+                            = intersect([x_all_age{ii} y_all_age{ii}], [x_all_age_max{ii} y_all_age_max{ii}], 'rows', 'stable');
+            [x_all_age_max{ii}, y_all_age_max{ii}, age_all_max{ii}] ...
+                            = deal(xy_all(:, 1), xy_all(:, 2), age_all_max{ii}(ind_common));
         end
     end
-    
+%%    
     if parallel_check
         disp('...fixed-depth layers...')
         parfor ii = 1:num_depth_norm
@@ -1179,6 +1260,10 @@ if do_grd2
                             = scatteredInterpolant(x_all_depth{ii}, y_all_depth{ii}, depth_all{ii}, 'natural', 'none');
                 depth_iso2(:, :, ii) ...
                             = depth_interpolant(x_grd, y_grd) .* thick_grd;
+                depth_uncert_interpolant ...
+                            = scatteredInterpolant(x_all_depth_uncert{ii}, y_all_depth_uncert{ii}, depth_uncert_all{ii}, 'natural', 'none');
+                depth_uncert_iso2(:, :, ii) ...
+                            = depth_uncert_interpolant(x_grd, y_grd) .* thick_grd;
             catch
                 disp([num2str(age_iso(ii)) '-ka isochrone failed...'])
             end
@@ -1208,6 +1293,10 @@ if do_grd2
                             = scatteredInterpolant(x_all_depth{ii}, y_all_depth{ii}, depth_all{ii}, 'natural', 'none');
                 depth_iso2(:, :, ii) ...
                             = depth_interpolant(x_grd, y_grd) .* thick_grd;
+                depth_uncert_interpolant ...
+                            = scatteredInterpolant(x_all_depth_uncert{ii}, y_all_depth_uncert{ii}, depth_uncert_all{ii}, 'natural', 'none');
+                depth_uncert_iso2(:, :, ii) ...
+                            = depth_uncert_interpolant(x_grd, y_grd) .* thick_grd;
             catch
                 disp([num2str(age_iso(ii)) '-ka isochrone failed...'])
             end
@@ -1215,12 +1304,15 @@ if do_grd2
     end
     
     % trim bad ages/depths
-    age_norm2(age_norm2 < 0)= NaN;
+    age_norm2((age_norm2 < 0) | (age_norm2 > age_max)) ...
+                            = NaN;
     age_uncert_norm2(age_uncert_norm2 < 0) ...
                             = NaN;
     depth_iso2(depth_iso2 < 0) ...
                             = NaN;
-    depth_iso2((elev_surf_grd(:, :, ones(1, 1, num_age_iso)) - depth_iso2) < elev_bed_grd(:, :, ones(1, 1, num_age_iso))) ...
+    depth_iso2(depth_iso2 > thick_grd(:, :, ones(1, 1, num_age_iso))) ...
+                            = NaN;
+    depth_uncert_iso2(depth_uncert_iso2 < 0) ...
                             = NaN;
     
     disp('...done 2-D gridding age.')
@@ -1229,10 +1321,10 @@ if do_grd2
         disp('Saving 2-D age grids...')
         switch radar_type
             case 'accum'
-                save('mat/age_grd2_accum', '-v7.3', 'age_norm2', 'age_uncert_norm2', 'age_iso', 'depth_iso2', 'depth_norm', 'num_age_iso', 'num_depth_norm', 'x_grd', 'y_grd')
+                save('mat/age_grd2_accum', '-v7.3', 'age_norm2', 'age_uncert_norm2', 'age_iso', 'depth_iso2', 'depth_norm', 'depth_uncert_iso2', 'num_age_iso', 'num_depth_norm', 'x_grd', 'y_grd')
                 disp('Saved 2-D age grids as mat/age_grd2_accum.mat.')
             case 'deep'
-                save('mat/age_grd2', '-v7.3', 'age_norm2', 'age_uncert_norm2', 'age_iso', 'depth_iso2', 'depth_norm', 'num_age_iso', 'num_depth_norm', 'x_grd', 'y_grd')
+                save('mat/age_grd2', '-v7.3', 'age_norm2', 'age_uncert_norm2', 'age_iso', 'depth_iso2', 'depth_norm', 'depth_uncert_iso2', 'num_age_iso', 'num_depth_norm', 'x_grd', 'y_grd')
                 disp('Saved 2-D age grids as mat/age_grd2.mat.')
         end
     end

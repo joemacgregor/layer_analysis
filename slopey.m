@@ -1,7 +1,7 @@
 % SLOPEY Analyze layer and bed slopes
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 08/07/13
+% Last updated: 09/15/13
 
 do_load                     = true;
 
@@ -35,13 +35,13 @@ for ii = 1:num_year
     [ind_decim5{ii}, num_decim5{ii}, poly_slope_layer{ii}, res_slope_bed{ii}, slope_bed{ii}, slope_bed_predict{ii}, slope_layer{ii}] ...
                             = deal(cell(1, num_trans(ii)));
     
-    for jj = find(num_fence{ii})
+    for jj = 1:num_trans(ii)
         
         [ind_decim5{ii}{jj}, poly_slope_layer{ii}{jj}, res_slope_bed{ii}{jj}, slope_bed{ii}{jj}, slope_bed_predict{ii}{jj}, slope_layer{ii}{jj}] ...
                             = deal(cell(1, length(ind_fence{ii}{jj})));
         num_decim5{ii}{jj}  = zeros(1, length(ind_fence{ii}{jj}));
         
-        for kk = find(ind_fence{ii}{jj})
+        for kk = 1:length(ind_fence{ii}{jj})
             
             if (num_layer{ii}{jj}(kk) > 5)
                 disp(['Transect: ' name_trans{ii}{jj} letters(kk) '...'])

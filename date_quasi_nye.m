@@ -1,24 +1,29 @@
-function varargout          = date_strain(depth_bound, age_bound, strain_rate, depth, tol, iter_max, return_type)
-% DATE_STRAIN Date an isochrone within a bounded layer using a self-consistent intra-layer uniform vertical strain rate.
-%
-%   [AGE/DEPTH,STRAIN_RATE] = DATE_STRAIN(DEPTH_BOUND,AGE_BOUND,STRAIN_RATE,DEPTH/AGE,TOL,ITER_MAX,RETURN_TYPE)
+function varargout          = date_quasi_nye(depth_bound, age_bound, strain_rate, depth, tol, iter_max, return_type)
+% DATE_QUASI_NYE Date an isochrone within a bounded layer using a self-consistent intra-layer uniform vertical strain rate.
+%   
+%   [AGE/DEPTH,STRAIN_RATE] = DATE_QUASI_NYE(DEPTH_BOUND,AGE_BOUND,STRAIN_RATE,DEPTH/AGE,TOL,ITER_MAX,RETURN_TYPE)
 %   determines the age AGE (yr) or DEPTH (m) of the isochrone at depth
 %   DEPTH (m) or AGE (yr) within the layer sandwiched between two dated
 %   isochrones with depths DEPTH_BOUND (m) and AGE_BOUND (yr) by assuming
-%   that the uniform vertical strain rate within that layer. It can also
-%   return the best-fit strain rate. STRAIN_RATE (1/yr) is the initial
+%   that the uniform vertical strain rate within that layer. This approach
+%   is termed "quasi-Nye" dating by MacGregor et al. [in revision]. It can
+%   also return the best-fit strain rate. STRAIN_RATE (1/yr) is the initial
 %   guess at the uniform vertical strain rate within the layer, TOL (m) is
 %   the tolerance on the depth residual and ITER_MAX is the maximum number
 %   of iterations. RETURN_TYPE is the string that determines which return
 %   is desired ('age' or 'depth' only).
-%
-%   This approach is adapted from Appendix B of MacGregor, J.A. et al.,
-%   2012, Spatial variation of englacial radar attenuation: Modeling
-%   approach and application to the Vostok flowline (2012), J. Geophys.
-%   Res., 117, F03022.
-%
+%   
+%   This approach is described in two studies:
+%   
+%   MacGregor, J.A. et al., 2012, Spatial variation of englacial radar
+%   attenuation: Modeling approach and application to the Vostok flowline
+%   (2012), J. Geophys. Res., 117, F03022.
+%   
+%   MacGregor, J.A. et al, in revision, Radiostratigraphy and age structure
+%   of the Greenland Ice Sheet, J. Geophys. Res.
+%   
 % Joe MacGregor (UTIG), Ed Waddington (UW)
-% Last updated: 08/28/14
+% Last updated: 09/15/14
 
 if (nargin ~= 7)
     error('date_strain:nargin', ['Number of arguments (' num2str(nargin) ') is not equal to 7.'])
@@ -32,11 +37,11 @@ end
 if (~isnumeric(depth) || ~isscalar(depth) || (depth <= 0))
     error('date_strain:depth', 'DEPTH is not a numeric positive scalar.')
 end
-if (~isnumeric(strain_rate) || ~isscalar(strain_rate))
-    error('date_strain:strainrate', 'STRAIN_RATE is not a numeric scalar.')
-end
 if (~isnumeric(tol) || ~isscalar(tol) || (tol <= 0))
     error('date_strain:tol', 'TOL is not a numeric positive scalar.')
+end
+if (~isnumeric(strain_rate) || ~isscalar(strain_rate))
+    error('date_strain:strainrate', 'STRAIN_RATE is not a numeric scalar.')
 end
 if (~isnumeric(iter_max) || ~isscalar(iter_max) || mod(iter_max, 1) || (iter_max < 1))
     error('date_strain:itermax', 'ITER_MAX is not a numeric scalar positive integer.')
@@ -63,16 +68,17 @@ while ((abs(R(depth_bound, age_bound, strain_rate)) > tol) && (ii < iter_max))
 end
 
 % age/depth of isochrone if strain rate converged; a = (-1/e) * log(1 - z/H_eff); H_eff = z_t / (1 - exp(-A_t * e)); Equations B5/7/9 of MacGregor et al. [2012, JGR]
-if ((ii < iter_max) && (depth < (depth_bound(1) / (1 - exp(-age_bound(1) * strain_rate)))))
+varargout{1}                = NaN;
+if (ii < iter_max)
     switch return_type
         case 'age'
-            varargout{1}    = (-1 / strain_rate) * log(1 - (depth / (depth_bound(1) / (1 - exp(-age_bound(1) * strain_rate)))));
+            if (depth < (depth_bound(1) / (1 - exp(-age_bound(1) * strain_rate))))
+                varargout{1}= (-1 / strain_rate) * log(1 - (depth / (depth_bound(1) / (1 - exp(-age_bound(1) * strain_rate)))));
+            end
         case 'depth'
             age             = depth;
             varargout{1}    = (depth_bound(1) / (1 - exp(-age_bound(1) * strain_rate))) * (1 - exp(-age * strain_rate));
     end
-else
-    varargout{1}            = NaN;
 end
 
 if (nargout == 2)

@@ -7,7 +7,7 @@
 %   transect.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 08/08/14
+% Last updated: 08/31/14
 
 clear
 
@@ -18,6 +18,8 @@ plotting                    = false;
 
 load([dir_save 'gimp_proj'], 'gimp_proj')
 
+wgs84                       = wgs84Ellipsoid;
+
 %% concatenate x/y positions for each campaign
 
 if do_xy
@@ -26,7 +28,7 @@ if do_xy
     name_year               = {'2011_accum' '2012_accum' '2013_accum'};
     num_year                = length(name_year);
     
-    [x, y, dist, dist_diff, num_frame, name_trans] ...
+    [lat, lon, dist, dist_diff, num_frame, name_trans, time, x, y] ...
                             = deal(cell(1, num_year));
     num_trans               = zeros(1, num_year);
         
@@ -50,7 +52,7 @@ if do_xy
         
         num_trans(ii)       = length(name_trans{ii});
         num_frame{ii}       = zeros(1, num_trans(ii));
-        [x{ii}, y{ii}, dist{ii}, dist_diff{ii}] ...
+        [lat{ii}, lon{ii}, dist{ii}, dist_diff{ii}, time{ii}, x{ii}, y{ii}] ...
                             = deal(cell(1, num_trans(ii)));
         
         for jj = 1:num_trans(ii)
@@ -79,8 +81,8 @@ if do_xy
                         ind_tmp ...
                             = find(time_curr > time_old(end));
                         if ~isempty(ind_tmp)
-                            [lat_curr, lon_curr] ...
-                                = deal(lat_curr(ind_tmp), lon_curr(ind_tmp));
+                            [lat_curr, lon_curr, time_curr] ...
+                                = deal(lat_curr(ind_tmp), lon_curr(ind_tmp), time_curr(ind_tmp));
                         else
                             continue % no points in this frame that don't overlap with previous one
                         end
@@ -89,21 +91,21 @@ if do_xy
                 
                 [x_curr, y_curr] ...
                             = projfwd(gimp_proj, lat_curr, lon_curr);
-                [x{ii}{jj}, y{ii}{jj}] ...
-                            = deal([x{ii}{jj} (1e-3 .* single(x_curr))], [y{ii}{jj} (1e-3 .* single(y_curr))]); % m to km
+                [lat{ii}{jj}, lon{ii}{jj}, time{ii}{jj}, x{ii}{jj}, y{ii}{jj}] ...
+                            = deal([lat{ii}{jj} lat_curr], [lon{ii}{jj} lon_curr], [time{ii}{jj} time_curr], [x{ii}{jj} (1e-3 .* x_curr)], [y{ii}{jj} (1e-3 .* y_curr)]);
                 
                 time_old    = time_curr;
                 
             end
             
-            dist{ii}{jj}    = 1e-3 .* cumsum([0 distance([lat_curr(1:(end - 1))' lon_curr(1:(end - 1))'], [lat_curr(2:end)' lon_curr(2:end)'], almanac('earth', 'wgs84', 'meters'))']);
+            dist{ii}{jj}    = 1e-3 .* cumsum([0 distance([lat{ii}{jj}(1:(end - 1))' lon{ii}{jj}(1:(end - 1))'], [lat{ii}{jj}(2:end)' lon{ii}{jj}(2:end)'], wgs84)']);
             dist_diff{ii}{jj} ...
                             = diff(dist{ii}{jj});
             
         end
     end
     
-    save([dir_save 'xy_all_accum'], 'x', 'y', 'dist', 'dist_diff', 'num_frame', 'num_trans', 'num_year', 'name_year', 'name_trans')
+    save([dir_save 'xy_all_accum'], 'dist', 'dist_diff', 'lat', 'lon', 'num_frame', 'num_trans', 'num_year', 'name_year', 'name_trans', 'time', 'x', 'y')
     disp(['Done extracting x/y positions and saved in ' dir_save '.'])
     
 else
