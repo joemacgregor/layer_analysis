@@ -5,20 +5,18 @@ function isogui
 %   dated traced/gridded reflectors/isochrones.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 08/07/14
+% Last updated: 09/23/14
 
 %% Intialize variables
 
 load mat/xy_all num_year num_trans
-load mat/merge_all elev_smooth_gimp ind_decim ind_fence num_fence num_layer x_pk y_pk
-load mat/date_all age %age_best layer_unique num_unique
+load mat/merge_all elev_smooth_gimp ind_decim_mid ind_fence num_fence num_layer x_pk y_pk
+load mat/date_all age
 load mat/core_int x_core y_core name_core num_core
 load mat/grl_coast num_coast x_coast y_coast
 load mat/greenland_bed_v3 elev_bed elev_surf mask_greenland mask_gris x y
 load mat/age_grd2 age_iso depth_iso2 x_grd y_grd
 load mat/grl_basin x_basin y_basin num_basin
-
-% age_best(:, 1:2)            = 1e-3 .* age_best(:, 1:2);
 
 int_year                    = 1e3 .* (5:10:125);
 num_int_year                = length(int_year);
@@ -31,10 +29,6 @@ elev_surf_grd(~mask_greenland | ~mask_gris) ...
                             = NaN;
 clear elev_bed elev_surf mask_greenland mask_gris
 
-% decim                       = 2;
-% [depth_iso2, elev_bed_grd, elev_surf_grd] ...
-%                             = deal(depth_iso2(1:decim:end, 1:decim:end, :), elev_bed_grd(1:decim:end, 1:decim:end), elev_surf_grd(1:decim:end, 1:decim:end), x_grd(1:decim:end, 1:decim:end), ...
-%                                    y_grd(1:decim:end, 1:decim:end));
 [x_min, x_max, y_min, y_max]= deal(-632, 846, -3344, -670);
 [elev_bed_grd, elev_surf_grd] ...
                             = deal(elev_bed_grd(((y(:, 1) >= y_min) & (y(:, 1) <= y_max)), ((x(1, :) >= x_min) & (x(1, :) <= x_max))), elev_surf_grd(((y(:, 1) >= y_min) & (y(:, 1) <= y_max)), ((x(1, :) >= x_min) & (x(1, :) <= x_max))));
@@ -63,7 +57,7 @@ end
 curr_iso                    = 1;
 curr_dim                    = '3D';
 
-%% draw first GUI
+%% draw GUI
 
 set(0, 'DefaultFigureWindowStyle', 'docked')
 if ispc % windows switch
@@ -115,24 +109,20 @@ for ii = 1:num_year %#ok<*FXUP>
         continue
     end
     p_pk{ii}                = cell(1, num_trans(ii));
-    for jj = find(num_fence{ii})
+    for jj = 1:num_trans(ii)
         p_pk{ii}{jj}        = cell(1, length(ind_fence{ii}{jj}));
-        for kk = find(ind_fence{ii}{jj})
-            ind_decim_mid   = round(ind_decim{ii}{jj}{kk}(1:(end - 1)) + (diff(ind_decim{ii}{jj}{kk}) ./ 2));
+        for kk = 1:length(ind_fence{ii}{jj})
             p_pk{ii}{jj}{kk}= zeros(1, num_layer{ii}{jj}(kk));
             for ll = 1:num_layer{ii}{jj}(kk)
-                if (any(~isnan(elev_smooth_gimp{ii}{jj}{kk}(ll, ind_decim_mid))) && ~isnan(age{ii}{jj}{kk}(ll))) % layer default gray
+                if (any(~isnan(elev_smooth_gimp{ii}{jj}{kk}(ll, ind_decim_mid{ii}{jj}{kk}))) && ~isnan(age{ii}{jj}{kk}(ll))) % layer default gray
                     p_pk{ii}{jj}{kk}(ll) ...
-                            = plot3(x_pk{ii}{jj}{kk}(ind_decim_mid(~isnan(elev_smooth_gimp{ii}{jj}{kk}(ll, ind_decim_mid)))), ...
-                                    y_pk{ii}{jj}{kk}(ind_decim_mid(~isnan(elev_smooth_gimp{ii}{jj}{kk}(ll, ind_decim_mid)))), ...
-                                    elev_smooth_gimp{ii}{jj}{kk}(ll, ind_decim_mid(~isnan(elev_smooth_gimp{ii}{jj}{kk}(ll, ind_decim_mid)))), ...
+                            = plot3(x_pk{ii}{jj}{kk}(ind_decim_mid{ii}{jj}{kk}(~isnan(elev_smooth_gimp{ii}{jj}{kk}(ll, ind_decim_mid{ii}{jj}{kk})))), y_pk{ii}{jj}{kk}(ind_decim_mid{ii}{jj}{kk}(~isnan(elev_smooth_gimp{ii}{jj}{kk}(ll, ind_decim_mid{ii}{jj}{kk})))), ...
+                                    elev_smooth_gimp{ii}{jj}{kk}(ll, ind_decim_mid{ii}{jj}{kk}(~isnan(elev_smooth_gimp{ii}{jj}{kk}(ll, ind_decim_mid{ii}{jj}{kk})))), ...
                                     '.', 'color', colors((65 + interp1(int_year, 1:num_int_year, age{ii}{jj}{kk}(ll), 'nearest', 'extrap')), :), 'markersize', 6, 'tag', num2str([ii jj kk ll]), 'visible', 'off');
-                elseif any(~isnan(elev_smooth_gimp{ii}{jj}{kk}(ll, ind_decim_mid)))
+                elseif any(~isnan(elev_smooth_gimp{ii}{jj}{kk}(ll, ind_decim_mid{ii}{jj}{kk})))
                     p_pk{ii}{jj}{kk}(ll) ...
-                            = plot3(x_pk{ii}{jj}{kk}(ind_decim_mid(~isnan(elev_smooth_gimp{ii}{jj}{kk}(ll, ind_decim_mid)))), ...
-                                    y_pk{ii}{jj}{kk}(ind_decim_mid(~isnan(elev_smooth_gimp{ii}{jj}{kk}(ll, ind_decim_mid)))), ...
-                                    elev_smooth_gimp{ii}{jj}{kk}(ll, ind_decim_mid(~isnan(elev_smooth_gimp{ii}{jj}{kk}(ll, ind_decim_mid)))), ...
-                                    '.', 'color', [0.5 0.5 0.5], 'markersize', 4, 'tag', num2str([ii jj kk ll]), 'visible', 'off');
+                            = plot3(x_pk{ii}{jj}{kk}(ind_decim_mid{ii}{jj}{kk}(~isnan(elev_smooth_gimp{ii}{jj}{kk}(ll, ind_decim_mid{ii}{jj}{kk})))), y_pk{ii}{jj}{kk}(ind_decim_mid{ii}{jj}{kk}(~isnan(elev_smooth_gimp{ii}{jj}{kk}(ll, ind_decim_mid{ii}{jj}{kk})))), ...
+                                    elev_smooth_gimp{ii}{jj}{kk}(ll, ind_decim_mid{ii}{jj}{kk}(~isnan(elev_smooth_gimp{ii}{jj}{kk}(ll, ind_decim_mid{ii}{jj}{kk})))), '.', 'color', [0.5 0.5 0.5], 'markersize', 4, 'tag', num2str([ii jj kk ll]), 'visible', 'off');
                 end
             end
         end

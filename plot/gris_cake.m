@@ -1,9 +1,9 @@
 % GRIS_CAKE Layer cake animations.
 %
 % Joe MacGregor (UTIG)
-% Last updated: 08/07/14
+% Last updated: 09/24/14
 
-clear all
+clear
 
 plotting                    = false;
 
@@ -61,7 +61,7 @@ y_cake                      = y_grd(find(sum(sum(~isnan(age_norm2), 3), 2), 1):f
 num_cake_x                  = length(x_cake);
 num_cake_y                  = length(y_cake);
 
-% clean up MOG
+% % clean up MOG
 [x_mog, y_mog]              = deal(-1199:900, -3399:-600);
 mog                         = flipud(double(mog(((y_mog >= y_min) & (y_mog <= y_max)), ((x_mog >= x_min) & (x_mog <= x_max)))));
 
@@ -186,6 +186,9 @@ y_cake_set                  = NaN((num_depth_norm + 1), num_x, num_cake_x);
 for ii = 1:num_cake_y
     y_cake_set(:, :, ii)    = y_cake(ii) .* ones((num_depth_norm + 1), num_x);
 end
+
+% reorder for all plot
+age_slice_plots_y           = age_slice_plots_y([2 1 3]);
 
 %%
 if plotting
@@ -375,15 +378,15 @@ if plotting
     shading flat
     pes                     = surf(x_grd, y_grd, elev_surf_grd, 'cdatamapping', 'direct', 'cdata', ind_mog);
     shading flat
-    annotation('textbox', 'position', [0.86 0.92 0.11 0.04], 'string', 'Ice age (ka)', 'color', 'k', 'fontsize', 24, 'fontweight', 'bold', 'linestyle', 'none')
-    annotation('textbox', 'position', [0.90 0.87 0.11 0.04], 'string', '0', 'color', 'k', 'fontsize', 22, 'fontweight', 'bold', 'linestyle', 'none')
-    annotation('textbox', 'position', [0.90 0.55 0.11 0.04], 'string', '11.7', 'color', 'k', 'fontsize', 22, 'fontweight', 'bold', 'linestyle', 'none')
-    annotation('textbox', 'position', [0.90 0.23 0.11 0.04], 'string', '115', 'color', 'k', 'fontsize', 22, 'fontweight', 'bold', 'linestyle', 'none')
-    annotation('textbox', 'position', [0.90 0.07 0.11 0.04], 'string', '>130', 'color', 'k', 'fontsize', 22, 'fontweight', 'bold', 'linestyle', 'none')
-    annotation('textbox', 'position', [0.90 0.71 0.11 0.04], 'string', 'Holocene', 'color', [0 0.9 0], 'fontsize', 22, 'fontweight', 'bold', 'linestyle', 'none')
-    annotation('textbox', 'position', [0.90 0.40 0.11 0.04], 'string', {'Last Glacial'; 'Period'}, 'color', [0 0 0.9], 'fontsize', 22, 'fontweight', 'bold', 'linestyle', 'none')
-    annotation('textbox', 'position', [0.90 0.15 0.11 0.04], 'string', 'Eemian', 'color', 'r', 'fontsize', 22, 'fontweight', 'bold', 'linestyle', 'none')
-    pve                     = annotation('textbox', 'position', [0.70 0.07 0.2 0.04], 'string', '100:1 vertical exaggeration', 'color', 'k', 'fontsize', 22, 'fontweight', 'bold', 'linestyle', 'none');
+    annotation('textbox', 'position', [0.71 0.92 0.11 0.04], 'string', 'Ice age (ka)', 'color', 'k', 'fontsize', 24, 'fontweight', 'bold', 'linestyle', 'none')
+    annotation('textbox', 'position', [0.75 0.87 0.11 0.04], 'string', '0', 'color', 'k', 'fontsize', 22, 'fontweight', 'bold', 'linestyle', 'none')
+    annotation('textbox', 'position', [0.75 0.55 0.11 0.04], 'string', '11.7', 'color', 'k', 'fontsize', 22, 'fontweight', 'bold', 'linestyle', 'none')
+    annotation('textbox', 'position', [0.75 0.23 0.11 0.04], 'string', '115', 'color', 'k', 'fontsize', 22, 'fontweight', 'bold', 'linestyle', 'none')
+    annotation('textbox', 'position', [0.75 0.07 0.11 0.04], 'string', '>130', 'color', 'k', 'fontsize', 22, 'fontweight', 'bold', 'linestyle', 'none')
+    annotation('textbox', 'position', [0.75 0.71 0.11 0.04], 'string', 'Holocene', 'color', [0 0.9 0], 'fontsize', 22, 'fontweight', 'bold', 'linestyle', 'none')
+    annotation('textbox', 'position', [0.75 0.40 0.11 0.04], 'string', {'Last Glacial'; 'Period'}, 'color', [0 0 0.9], 'fontsize', 22, 'fontweight', 'bold', 'linestyle', 'none')
+    annotation('textbox', 'position', [0.75 0.15 0.11 0.04], 'string', 'Eemian', 'color', 'r', 'fontsize', 22, 'fontweight', 'bold', 'linestyle', 'none')
+    pve                     = annotation('textbox', 'position', [0.55 0.07 0.2 0.04], 'string', '100:1 vertical exaggeration', 'color', 'k', 'fontsize', 22, 'fontweight', 'bold', 'linestyle', 'none');
     for ii = 1:num_coast
         plot3(x_coast{ii}, y_coast{ii}, zeros(1, length(x_coast{ii})), 'color', 'k', 'linewidth', 1.5)
     end
@@ -400,9 +403,10 @@ if plotting
     view([0 30])
     set(gca, 'fontsize', 22, 'dataaspectratio', [1 1 10], 'visible', 'off')
     caxis([1 size(colors_single, 1)])
+%     cb                      = colorbar('location', 'eastoutside', 'ylim', [2048 2058], 'ytick', 2048:2058, 'yticklabel', {}, 'fontsize', 20, 'position', [0.73 0.1 0.015 0.8]);
     cb                      = cbarf([2049 (size(colors_single, 1) + 1)], 2049:(size(colors_single, 1) + 1), 'vertical', 'linear');
-    set(cb, 'position', [0.88 0.1 0.015 0.8], 'yticklabel', {})
-    annotation('line', [0.894791666666667 0.8796875], [0.9 0.9]);
+    set(cb, 'position', [0.73 0.1 0.015 0.8], 'yticklabel', {})
+    annotation('line', [0.73 0.745], [0.9 0.9]);
     grid off
     box off
     
@@ -468,10 +472,10 @@ if plotting
             annotation('textbox', 'position', [0.13 0.83 0.11 0.04], 'string', '(a) Nye model', 'color', 'k', 'fontsize', 24, 'fontweight', 'bold', 'linestyle', 'none')
             annotation('textbox', 'position', [0.46 0.83 0.11 0.04], 'string', '(b) Observed', 'color', 'k', 'fontsize', 24, 'fontweight', 'bold', 'linestyle', 'none')
             annotation('textbox', 'position', [0.75 0.83 0.18 0.04], 'string', '(c) Observed - Nye model', 'color', 'k', 'fontsize', 24, 'fontweight', 'bold', 'linestyle', 'none')
-            annotation('textbox', 'position', [0.78 0.12 0.15 0.04], 'string', 'Relative difference (%)', 'color', 'k', 'fontsize', 20, 'fontweight', 'bold', 'linestyle', 'none')
+            annotation('textbox', 'position', [0.77 0.12 0.15 0.04], 'string', 'Relative difference (%)', 'color', 'k', 'fontsize', 20, 'fontweight', 'bold', 'linestyle', 'none')
             annotation('textbox', 'position', [0.93 0.05 0.11 0.04], 'string', '>100', 'color', 'k', 'fontsize', 20, 'fontweight', 'bold', 'linestyle', 'none')
-            annotation('textbox', 'position', [0.835 0.05 0.11 0.04], 'string', '0', 'color', 'k', 'fontsize', 20, 'fontweight', 'bold', 'linestyle', 'none')
-            annotation('textbox', 'position', [0.72 0.05 0.11 0.04], 'string', '<-100', 'color', 'k', 'fontsize', 20, 'fontweight', 'bold', 'linestyle', 'none')
+            annotation('textbox', 'position', [0.825 0.05 0.11 0.04], 'string', '0', 'color', 'k', 'fontsize', 20, 'fontweight', 'bold', 'linestyle', 'none')
+            annotation('textbox', 'position', [0.70 0.05 0.11 0.04], 'string', '<-100', 'color', 'k', 'fontsize', 20, 'fontweight', 'bold', 'linestyle', 'none')
             pve             = annotation('textbox', 'position', [0.55 0.15 0.2 0.04], 'string', '100:1 vertical exaggeration', 'color', 'k', 'fontsize', 20, 'fontweight', 'bold', 'linestyle', 'none');
         end
         for jj = 1:num_coast
@@ -499,10 +503,10 @@ if plotting
                 set(cbf, 'position', [0.5 0.51 0.05 0.02], 'xticklabel', {}, 'fontsize', 20, 'visible', 'off')
             case 3
                 cb2         = cbarf([2059 (size(colors_all, 1) + 1)], 2059:(size(colors_all, 1) + 1), 'horiz', 'linear');
-                set(cb2, 'position', [0.74 0.10 0.2 0.02], 'xticklabel', {}, 'fontsize', 20)
+                set(cb2, 'position', [0.72 0.10 0.225 0.02], 'xticklabel', {}, 'fontsize', 20)
 %                 colorbar('location', 'southoutside', 'xlim', [2058 size(colors_all, 1)], 'xtick', 2058:size(colors_all, 1), 'xticklabel', {}, 'fontsize', 20, 'position', [0.74 0.10 0.2 0.02])
         end
-        annotation('line', [0.58 0.58], [0.10 0.12]);
+        annotation('line', [0.5805 0.5805], [0.10 0.12]);
         grid off
         box off
     end
