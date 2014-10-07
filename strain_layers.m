@@ -1,5 +1,5 @@
 function strain_layers(age_max, data_str, do_strain, do_fix, do_uncert, do_bad, do_smooth, do_grd, do_save, num_smooth, strain_rate_ref)
-% STRAIN_LAYERS 1-D strain-rate modeling using dated layers.
+% STRAIN_LAYERS 1-D ice-flow modeling using dated layers.
 % 
 % STRAIN_LAYERS(AGE_MAX,DATA_STR,DO_STRAIN,DO_FIX,DO_UNCERT,DO_BAD,DO_SMOOTH,DO_GRD,DO_SAVE,NUM_SMOOTH,STRAIN_RATE_REF)
 % calculates the best-fit parameters for several 1-D strain-rate models
@@ -8,17 +8,17 @@ function strain_layers(age_max, data_str, do_strain, do_fix, do_uncert, do_bad, 
 % e.g., 'deep' or 'accum'. DO_STRAIN is a 5-element logical vector that
 % determines which models to run (true). The order is: Nye,
 % Dansgaard-Johnsen, Nye+melt, Dansgaard-Johnsen+melt, shallow strain.
-% DO_UNCERT, DO_BAD, DO_SMOOTH, DO_GRD and DO_SAVE are logical scalars that
-% determine whether uncertainties are calculated, whether bad traces are
-% NaN'd out, whether the along-transect values are smoothed, whether grids
-% are calculated and whether the results are saved, respectively. If
-% DO_SMOOTH=TRUE, then the number of samples NUM_SMOOTH over which to
-% smooth the along-transect strain-rate model parameters must also be
-% given. If DO_FIX=TRUE, then a previously modeled vertical strain-rate
-% field is used instead.
+% DO_FIX,DO_UNCERT, DO_BAD, DO_SMOOTH, DO_GRD and DO_SAVE are logical
+% scalars that determine whether uncertainties are calculated, whether bad
+% traces are NaN'd out, whether the along-transect values are smoothed,
+% whether grids are calculated and whether the results are saved,
+% respectively. If DO_SMOOTH=TRUE, then the number of samples NUM_SMOOTH
+% over which to smooth the along-transect strain-rate model parameters must
+% also be given. If DO_FIX=TRUE, then a previously modeled vertical
+% strain-rate field is used instead.
 % 
 % Joe MacGregor (UTIG), Mark Fahnestock (UAF)
-% Last updated: 09/14/14
+% Last updated: 10/06/14
 
 if ~exist('nye_fit', 'file')
     error('strain_layers:nyefit', 'Function NYE_FIT is not available within this user''s path.')
@@ -38,8 +38,8 @@ end
 if ~exist('shallow_strain_fix', 'file')
     error('strain_layers:shallowstrainfix', 'Function SHALLOW_STRAIN_FIX is not available within this user''s path.')
 end
-if ~exist('strain_bound', 'file')
-    error('strain_layers:strainbound', 'Function STRAIN_BOUND is not available within this user''s path.')
+if ~exist('strain_uncert', 'file')
+    error('strain_layers:strainuncert', 'Function STRAIN_UNCERT is not available within this user''s path.')
 end
 if ~exist('smooth_lowess', 'file')
     error('strain_layers:smoothlowess', 'Function SMOOTH_LOWESS is not available within this user''s path.')
@@ -365,7 +365,7 @@ for ii = 1:num_year
                                     = fminsearch(@shallow_strain_fix, accum_ref, opt, depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, strain_rate_slice(ll)); %#ok<AGROW>
                                 if do_uncert
                                     accum_shallow_uncert_slice(:, ll) ...
-                                        = strain_uncert(frac_test, conf_uncert, 'shallow', thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, tmp1, res_shallow_slice(ll)); %#ok<AGROW>
+                                        = strain_uncert(frac_test, conf_uncert, 'shallow_strain', thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, tmp1, res_shallow_slice(ll)); %#ok<AGROW>
                                 end
                             else
                                 [tmp1, res_shallow_slice(ll)] ...
@@ -374,7 +374,7 @@ for ii = 1:num_year
                                     = deal(tmp1(1), tmp1(2)); %#ok<AGROW>
                                 if do_uncert
                                     [accum_shallow_uncert_slice(:, ll), strain_rate_uncert_slice(:, ll)] ...
-                                        = strain_uncert(frac_test, conf_uncert, 'shallow', thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, tmp1, res_shallow_slice(ll)); %#ok<NASGU,AGROW>
+                                        = strain_uncert(frac_test, conf_uncert, 'shallow_strain', thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, tmp1, res_shallow_slice(ll)); %#ok<NASGU,AGROW>
                                 end
                             end
                         catch
@@ -537,11 +537,21 @@ end
 % NaN out poor strain-rate model results
 if do_bad
     disp('Erasing results from known bad transect portions...')
-    trans2nan               = [];
-    load mat/merge_all dist_gimp
+    trans2nan               = [4  7  6 75   77;
+                               5  1  6 2715 2730;
+                               6  2  2 3181 3212;
+                               6  7  4 2428 2432;
+                               6  8  3 4219 4240;
+                               6  11 4 4000 4020;
+                               9  4  1 2280 2360;
+                               11 6  1 1140 1261;
+                               12 8  1 2700 2710;
+                               19 51 2 3115 3130;
+                               20 4  2 2980 2985];
+    load mat/merge_all dist
     for ii = 1:size(trans2nan, 1)
-        ind2nan             = find((dist_gimp{trans2nan(ii, 1)}{trans2nan(ii, 2)}{trans2nan(ii, 3)}(ind_decim_mid{trans2nan(ii, 1)}{trans2nan(ii, 2)}{trans2nan(ii, 3)}) >= trans2nan(ii, 4)) & ...
-                                   (dist_gimp{trans2nan(ii, 1)}{trans2nan(ii, 2)}{trans2nan(ii, 3)}(ind_decim_mid{trans2nan(ii, 1)}{trans2nan(ii, 2)}{trans2nan(ii, 3)}) <= trans2nan(ii, 5))); ...
+        ind2nan             = find((dist{trans2nan(ii, 1)}{trans2nan(ii, 2)}{trans2nan(ii, 3)}(ind_decim_mid{trans2nan(ii, 1)}{trans2nan(ii, 2)}{trans2nan(ii, 3)}) >= trans2nan(ii, 4)) & ...
+                                   (dist{trans2nan(ii, 1)}{trans2nan(ii, 2)}{trans2nan(ii, 3)}(ind_decim_mid{trans2nan(ii, 1)}{trans2nan(ii, 2)}{trans2nan(ii, 3)}) <= trans2nan(ii, 5))); ...
                               %#ok<NASGU>
         for jj = find(do_strain)
             for kk = num_param(jj)
@@ -607,23 +617,25 @@ if do_grd
                             continue
                         end
                         x_all ...
-                            = [x_all; x_pk{kk}{ll}{mm}(ind_decim{kk}{ll}{mm}(1:(end - 1)) + round(diff(ind_decim{kk}{ll}{mm}) ./ 2))']; %#ok<AGROW>
+                            = [x_all; x_pk{kk}{ll}{mm}(ind_decim_mid{kk}{ll}{mm})']; %#ok<AGROW>
                         y_all ...
-                            = [y_all; y_pk{kk}{ll}{mm}(ind_decim{kk}{ll}{mm}(1:(end - 1)) + round(diff(ind_decim{kk}{ll}{mm}) ./ 2))']; %#ok<AGROW>
+                            = [y_all; y_pk{kk}{ll}{mm}(ind_decim_mid{kk}{ll}{mm})']; %#ok<AGROW>
                         param_all ...
                             = [param_all; eval([strain_param{ii}{jj} '{kk}{ll}{mm}'''])]; %#ok<AGROW>
                         if do_uncert
                             for nn = 1:2
                                 param_all_uncert{nn} ...
-                                = [param_all_uncert{nn}; eval([strain_param{ii}{jj} '_uncert{kk}{ll}{mm}(nn, :)'''])];
+                                    = [param_all_uncert{nn}; eval([strain_param{ii}{jj} '_uncert{kk}{ll}{mm}(nn, :)'''])];
                             end
                         end
                     end
                 end
             end
+            [x_all_ref, y_all_ref] ...
+                            = deal(x_all, y_all);
             ind_good        = find(~isnan(param_all));
             [x_all, y_all, param_all] ...
-                            = deal(x_all(ind_good), y_all(ind_good), param_all(ind_good));
+                            = deal(x_all_ref(ind_good), y_all_ref(ind_good), param_all(ind_good));
             [xy_all, ind_unique] ...
                             = unique([x_all y_all], 'rows');
             [x_all, y_all, param_all] ...
@@ -639,7 +651,7 @@ if do_grd
                 for kk = 1:2
                     ind_good= find(~isnan(param_all_uncert{kk}));
                     [x_all_tmp, y_all_tmp, param_all_uncert{kk}] ...
-                            = deal(x_all(ind_good), y_all(ind_good), param_all_uncert{kk}(ind_good));
+                            = deal(x_all_ref(ind_good), y_all_ref(ind_good), param_all_uncert{kk}(ind_good));
                     [xy_all_tmp, ind_unique] ...
                             = unique([x_all_tmp y_all_tmp], 'rows');
                     [x_all_tmp, y_all_tmp, param_all_uncert{kk}] ...

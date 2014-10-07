@@ -1,7 +1,7 @@
-function varargout          = strain_bound(frac_test, conf_bound, model, thick, depth, age, age_uncert, model_ref, res_ref)
-% STRAIN_BOUND Calculate parameter confidence bounds for a strain-rate model.
+function varargout          = strain_uncert(frac_test, conf_bound, model, thick, depth, age, age_uncert, model_ref, res_ref)
+% STRAIN_UNCERT Calculate parameter confidence bounds for a strain-rate model.
 % 
-% [PARAM1,PARAM2,...] = STRAIN_BOUND(FRAC_TEST,CONF_BOUND,MODEL,THICK,DEPTH,AGE,AGE_UNCERT,MODEL_REF,RES_REF)
+% [PARAM1,PARAM2,...] = STRAIN_UNCERT(FRAC_TEST,CONF_BOUND,MODEL,THICK,DEPTH,AGE,AGE_UNCERT,MODEL_REF,RES_REF)
 % calculates the confidence bounds of 1D strain-rate model parameters.
 % FRAC_TEST is the vector of fractions of the best-fit (i.e., reference)
 % model parameters about which to test, CONF_BOUND is the scalar desired
@@ -14,55 +14,55 @@ function varargout          = strain_bound(frac_test, conf_bound, model, thick, 
 % model.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 10/14/13
+% Last updated: 10/07/14
 
 if (nargin ~= 9)
-    error('strain_bound:nargin', 'Incorrect number of input arguments (should be 9).')
+    error('strain_uncert:nargin', 'Incorrect number of input arguments (should be 9).')
 end
 if ~exist('delta_chisq', 'file')
-    error('strain_bound:delta_chisq', 'Function DELTA_CHISQ is not available within this user''s path.')
+    error('strain_uncert:delta_chisq', 'Function DELTA_CHISQ is not available within this user''s path.')
 end
 if (~isnumeric(frac_test) || ~isvector(frac_test))
-    error('strain_bound:frac_test', 'FRAC_TEST is not a numeric vector.')
+    error('strain_uncert:frac_test', 'FRAC_TEST is not a numeric vector.')
 end
 if (~isnumeric(conf_bound) || ~isscalar(conf_bound))
-    error('strain_bound:tol', 'CONF_BOUND is not a numeric scalar.')
+    error('strain_uncert:tol', 'CONF_BOUND is not a numeric scalar.')
 end
 if ((conf_bound <= 0) || (conf_bound >= 1))
-    error('strain_bound:tol', 'CONF_BOUND is not between 0 and 1.')
+    error('strain_uncert:tol', 'CONF_BOUND is not between 0 and 1.')
 end
 if ~ischar(model)
-    error('strain_bound:modelchar', 'MODEL is not a string.')
+    error('strain_uncert:modelchar', 'MODEL is not a string.')
 end
 if ~any(strcmp(model, {'dj' 'dj_melt' 'nye' 'nye_melt' 'shallow_strain'}))
-    error('strain_bound:model', 'MODEL is not one of the recognized strain-rate models: ''dj'', ''dj_melt'', ''nye'', ''nye_melt'' or ''shallow_strain'').')
+    error('strain_uncert:model', 'MODEL is not one of the recognized strain-rate models: ''dj'', ''dj_melt'', ''nye'', ''nye_melt'' or ''shallow_strain'').')
 end
 if (~isnumeric(thick) || ~isscalar(thick))
-    error('strain_bound:thick', 'THICK is not a numeric scalar.')
+    error('strain_uncert:thick', 'THICK is not a numeric scalar.')
 end
 if (thick <= 0)
-    error('strain_bound:thickpos', 'THICK is not positive.')
+    error('strain_uncert:thickpos', 'THICK is not positive.')
 end
 if (~isnumeric(depth) || ~iscolumn(depth))
-    error('strain_bound:depth', 'DEPTH is not a numeric column vector.')
+    error('strain_uncert:depth', 'DEPTH is not a numeric column vector.')
 end
 if (~isnumeric(age) || ~iscolumn(age))
-    error('strain_bound:age', 'AGE is not a numeric column vector.')
+    error('strain_uncert:age', 'AGE is not a numeric column vector.')
 end
 if (~isnumeric(age_uncert) || ~iscolumn(age_uncert))
-    error('strain_bound:age_uncert', 'AGE_UNCERT is not a numeric column vector.')
+    error('strain_uncert:age_uncert', 'AGE_UNCERT is not a numeric column vector.')
 end
 if (~isnumeric(model_ref) || ~isvector(model_ref))
-    error('strain_bound:model_ref', 'MODEL_REF is not a numeric vector.')
+    error('strain_uncert:model_ref', 'MODEL_REF is not a numeric vector.')
 end
 if (length(model_ref) ~= nargout)
-    error('strain_bound:model_refnargout', 'Number of elements in MODEL_REF does match number of parameter confidence ranges to be calculated.')
+    error('strain_uncert:model_refnargout', 'Number of elements in MODEL_REF does match number of parameter confidence ranges to be calculated.')
 end
 if (~isnumeric(res_ref) || ~isscalar(res_ref))
-    error('strain_bound:res_ref', 'RES_REF is not a numeric scalar.')
+    error('strain_uncert:res_ref', 'RES_REF is not a numeric scalar.')
 end
 if (res_ref <= 0)
-    error('strain_bound:res_refpos', 'RES_REF is not positive.')
+    error('strain_uncert:res_refpos', 'RES_REF is not positive.')
 end
 
 num_param                   = length(model_ref);
