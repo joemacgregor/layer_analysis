@@ -1,7 +1,7 @@
 % DATE_LAYERS Date layers using ice-core depth/age scales and 1D/2D interpolation/extrapolation or quasi-Nye dating of overlapping dated layers.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 09/15/14
+% Last updated: 09/23/14
 
 clear
 
@@ -30,7 +30,7 @@ switch radar_type
         do_save             = false;
         do_grd1             = false;
         do_grd2             = true;
-        do_nye_norm         = false;
+        do_nye_norm         = true;
 end
 
 % variables of interest
@@ -100,7 +100,7 @@ switch radar_type
         load mat/range_resolution range_resolution
 end
 thick_trans                 = thick;
-load mat/greenland_bed_v3 thick x y
+load mat/greenland_mc_bed_1km thick x_grd y_grd
 thick_grd                   = thick;
 thick                       = thick_trans;
 clear thick_trans
@@ -147,15 +147,8 @@ ind_ngrip                   = find(strcmp(name_core_short, 'ngrip'));
 % dummy letters
 letters                     = 'a':'z';
 
-[x_grd, y_grd]              = deal(x, y);
-clear x y
-
 % Greenland-centered, GIMP-projected 1-km grid
 [x_min, x_max, y_min, y_max]= deal(-632, 846, -3344, -670);
-thick_grd                   = thick_grd(((y_grd(:, 1) >= y_min) & (y_grd(:, 1) <= y_max)), ((x_grd(1, :) >= x_min) & (x_grd(1, :) <= x_max)));
-[x_tmp, y_tmp]              = deal(x_grd(((y_grd(:, 1) >= y_min) & (y_grd(:, 1) <= y_max)), ((x_grd(1, :) >= x_min) & (x_grd(1, :) <= x_max))), y_grd(((y_grd(:, 1) >= y_min) & (y_grd(:, 1) <= y_max)), ((x_grd(1, :) >= x_min) & (x_grd(1, :) <= x_max))));
-[x_grd, y_grd]              = deal(x_tmp, y_tmp);
-clear x_tmp y_tmp
 
 if (do_grd1 || (do_grd2 && do_nye_norm))
     load mat/greenland_cism accum x y

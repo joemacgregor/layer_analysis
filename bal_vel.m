@@ -14,13 +14,6 @@ ind_y                       = find(~mod(y(:, 1), decim), 1):decim:find(~mod(y(:,
 [num_y, num_x]              = size(x);
 [num_decim_y, num_decim_x]  = deal(length(ind_y), length(ind_x));
 
-% % decimate grids
-% if ~isnan(age)
-%     [accum, depth, strain_rate] ...
-%                             = deal(accum(ind_y, ind_x), depth(ind_y, ind_x), strain_rate(ind_y, ind_x));
-% end
-% thick_shear                 = thick_shear(ind_y, ind_x);
-
 % filter grids
 if do_filt
     vars                    = {'thick_shear'};

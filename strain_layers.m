@@ -1,36 +1,39 @@
-function strain_layers(age_max, data_str, do_strain, do_fix, do_uncert, do_bad, do_smooth, do_grd, do_save, num_smooth, strain_rate_ref)
+function strain_layers(age_max, radar_type, do_strain, do_fix, do_uncert, do_bad, do_smooth, do_grd, do_save, num_smooth, strain_rate_ref)
 % STRAIN_LAYERS 1-D ice-flow modeling using dated layers.
 % 
 % STRAIN_LAYERS(AGE_MAX,DATA_STR,DO_STRAIN,DO_FIX,DO_UNCERT,DO_BAD,DO_SMOOTH,DO_GRD,DO_SAVE,NUM_SMOOTH,STRAIN_RATE_REF)
-% calculates the best-fit parameters for several 1-D strain-rate models
+% calculates the best-fit parameters for several 1-D ice-flow models
 % using dated layers younger than or equal to AGE_MAX (units of years).
-% DATA_STR is a string that determines which radar dataset to analyze,
+% RADAR_TYPE is a string that determines which radar dataset to analyze,
 % e.g., 'deep' or 'accum'. DO_STRAIN is a 5-element logical vector that
 % determines which models to run (true). The order is: Nye,
 % Dansgaard-Johnsen, Nye+melt, Dansgaard-Johnsen+melt, shallow strain.
-% DO_FIX,DO_UNCERT, DO_BAD, DO_SMOOTH, DO_GRD and DO_SAVE are logical
+% DO_FIX, DO_UNCERT, DO_BAD, DO_SMOOTH, DO_GRD and DO_SAVE are logical
 % scalars that determine whether uncertainties are calculated, whether bad
 % traces are NaN'd out, whether the along-transect values are smoothed,
 % whether grids are calculated and whether the results are saved,
 % respectively. If DO_SMOOTH=TRUE, then the number of samples NUM_SMOOTH
-% over which to smooth the along-transect strain-rate model parameters must
+% over which to smooth the along-transect ice-flow model parameters must
 % also be given. If DO_FIX=TRUE, then a previously modeled vertical
-% strain-rate field is used instead.
+% strain rate is used instead.
+% 
+% See also DJ_FIT, DJ_MELT_FIT, NYE_FIT, NYE_MELT_FIT, SHALLOW_STRAIN_FIT,
+% SMOOTH_LOWESS and STRAIN_UNCERT.
 % 
 % Joe MacGregor (UTIG), Mark Fahnestock (UAF)
-% Last updated: 10/06/14
+% Last updated: 10/15/14
 
-if ~exist('nye_fit', 'file')
-    error('strain_layers:nyefit', 'Function NYE_FIT is not available within this user''s path.')
-end
 if ~exist('dj_fit', 'file')
     error('strain_layers:djfit', 'Function DJ_FIT is not available within this user''s path.')
 end
-if ~exist('nye_melt_fit', 'file')
-    error('strain_layers:nyemeltfit', 'Function NYE_MELT_FIT is not available within this user''s path.')
-end
 if ~exist('dj_melt_fit', 'file')
     error('strain_layers:djmeltfit', 'Function DJ_MELT_FIT is not available within this user''s path.')
+end
+if ~exist('nye_fit', 'file')
+    error('strain_layers:nyefit', 'Function NYE_FIT is not available within this user''s path.')
+end
+if ~exist('nye_melt_fit', 'file')
+    error('strain_layers:nyemeltfit', 'Function NYE_MELT_FIT is not available within this user''s path.')
 end
 if ~exist('shallow_strain_fit', 'file')
     error('strain_layers:shallowstrainfit', 'Function SHALLOW_STRAIN_FIT is not available within this user''s path.')
@@ -47,8 +50,8 @@ end
 if ~any(nargin == [9 10 11])
     error('strain_layers:nargin', ['Number of arguments (' num2str(nargin) ') is not 9, 10 or 11.'])
 end
-if (~ischar(data_str) || ~any(strcmp(data_str, {'deep' 'accum'})))
-    error('strain_layers:data_str', 'DATA_STR is not a string equal to ''deep'' or ''accum''.')    
+if (~ischar(radar_type) || ~any(strcmp(radar_type, {'deep' 'accum'})))
+    error('strain_layers:radar_type', 'RADAR_TYPE is not a string equal to ''deep'' or ''accum''.')    
 end
 if (~islogical(do_strain) || ~isvector(do_strain) || (length(do_strain) ~= 5) || ~any(do_strain))
     error('strain_layers:dostrain', 'DO_STRAIN is not a logical 5-element vector that contains at least one true value.')
@@ -93,15 +96,15 @@ end
 
 disp('Starting strain-rate modeling...')
 
-switch data_str
-    case 'deep'
-        load mat/xy_all name_year name_trans num_year num_trans
-        load mat/merge_all depth_smooth ind_decim ind_decim_mid ind_fence num_decim thick_decim x_pk y_pk
-        load mat/date_all age age_uncert
+switch radar_type
     case 'accum'
         load mat/xy_all_accum name_year name_trans num_year num_trans
         load mat/merge_all_accum depth_smooth ind_decim ind_decim_mid ind_fence num_decim thick_decim x_pk y_pk
         load mat/date_all_accum age age_uncert
+    case 'deep'
+        load mat/xy_all name_year name_trans num_year num_trans
+        load mat/merge_all depth_smooth ind_decim ind_decim_mid ind_fence num_decim thick_decim x_pk y_pk
+        load mat/date_all age age_uncert
 end
 
 if license('checkout', 'distrib_computing_toolbox')
@@ -129,7 +132,7 @@ if do_strain(4)
     frac_slide_def          = 0; % initial sliding fraction (dimensionless)
 end
 if do_uncert
-    frac_test               = [0.25 0.5 1 5 10]; % range around best-fit model parameter about which to test
+    frac_test               = [0.01 0.025 0.05 0.1 0.25 0.5 1 5 10]; % range around best-fit model parameter about which to test
     conf_uncert             = 0.95; % confidence bound for uncertainty calculations, e.g., 0.95 is 95%
 end
 
@@ -242,7 +245,7 @@ for ii = 1:num_year
             
             if parallel_check
                 
-                % iterate at traces with at least three dated layers and an ice thickness
+                % iterate at traces with at least four dated layers and an ice thickness
                 curr_ind    = find((sum(~isnan(depth_smooth_decim)) > 3) & ~isnan(thick_decim{ii}{jj}{kk}));
                 thick_slice = thick_decim{ii}{jj}{kk}(curr_ind);
                 
@@ -278,83 +281,83 @@ for ii = 1:num_year
                             = strain_rate_ref{ii}{jj}{kk}(curr_ind);
                 end
                 
-                for ll = 1:length(curr_ind)
+                parfor ll = 1:length(curr_ind)
                     
                     % number layers used in current model
                     num_layer_strain_slice(ll) ...
-                            = length(curr_age{ll}); %#ok<NASGU,AGROW>
+                            = length(curr_age{ll}); %#ok<PFOUS,NASGU>
                     
                     % LLA accumulation rate, i.e., Nye model
                     [accum_nye_start_slice(ll), accum_ref] ...
-                            = deal(mean(-log(1 - (depth_smooth_cell{ll} ./ thick_slice(ll))) .* (thick_slice(ll) ./ curr_age{ll}))); %#ok<AGROW>
+                            = deal(mean(-log(1 - (depth_smooth_cell{ll} ./ thick_slice(ll))) .* (thick_slice(ll) ./ curr_age{ll}))); %#ok<PFOUS>
                     
-                    if do_strain(1)
+                    if do_strain(1) %#ok<PFBNS>
                         try % standard Nye model (iterative)
                             [accum_nye_slice(ll), res_nye_slice(ll)] ...
-                                = fminsearch(@nye_fit, accum_nye_start_slice(ll), opt, thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}); %#ok<AGROW>
+                                = fminsearch(@nye_fit, accum_nye_start_slice(ll), opt, thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}); %#ok<PFOUS>
                             if do_uncert
                                 accum_nye_uncert_slice(:, ll) ...
-                                    = strain_uncert(frac_test, conf_uncert, 'nye', thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, accum_nye_slice(ll), res_nye_slice(ll)); %#ok<AGROW,NASGU>
+                                    = strain_uncert(frac_test, conf_uncert, 'nye', thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, accum_nye_slice(ll), res_nye_slice(ll)); %#ok<PFOUS,NASGU>
                             end
                             accum_ref ...
                                 = accum_nye_slice(ll);
                         catch
                             ind_strain_fail_slice(ll) ...
-                                = 1; %#ok<AGROW>
+                                = 1; %#ok<PFOUS>
                         end
                     end
                     
                     if do_strain(2)
                         try % Dansgaard-Johnsen model (original)
                             [tmp1, res_dj_slice(ll)] ...
-                                = fminsearch(@dj_fit, [accum_ref thick_shear_def], opt, thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}); %#ok<AGROW>
+                                = fminsearch(@dj_fit, [accum_ref thick_shear_def], opt, thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}); %#ok<PFOUS>
                             [accum_dj_slice(ll), thick_shear_slice(ll)] ...
-                                = deal(tmp1(1), tmp1(2)); %#ok<AGROW>
+                                = deal(tmp1(1), tmp1(2)); %#ok<PFOUS>
                             if do_uncert
                                 [accum_dj_uncert_slice(:, ll), thick_shear_uncert_slice(:, ll)] ...
-                                    = strain_uncert(frac_test, conf_uncert, 'dj', thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, tmp1, res_dj_slice(ll)); %#ok<NASGU,AGROW>
+                                    = strain_uncert(frac_test, conf_uncert, 'dj', thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, tmp1, res_dj_slice(ll)); %#ok<PFOUS,NASGU>
                             end
                             accum_ref ...
                                 = accum_dj_slice(ll);
                         catch
                             ind_strain_fail_slice(ll) ...
-                                = 2; %#ok<AGROW>
+                                = 2;
                         end
                     end
                     
                     if do_strain(3)
                         try % Nye + melt model
-                            [tmp1, res_nye_melt_slice(ll)] ...
-                                = fminsearch(@nye_melt_fit, [accum_ref melt_rate_def], opt, thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}); %#ok<AGROW>
+                            [tmp2, res_nye_melt_slice(ll)] ...
+                                = fminsearch(@nye_melt_fit, [accum_ref melt_rate_def], opt, thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}); %#ok<PFOUS>
                             [accum_nye_melt_slice(ll), melt_bed_slice(ll)] ...
-                                = deal(tmp1(1), tmp1(2)); %#ok<AGROW>
+                                = deal(tmp2(1), tmp2(2)); %#ok<PFOUS>
                             if do_uncert
                                 [accum_nye_melt_uncert_slice(:, ll), melt_bed_uncert_slice(:, ll)] ...
-                                    = strain_uncert(frac_test, conf_uncert, 'nye_melt', thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, tmp1, res_nye_melt_slice(ll)); %#ok<AGROW,NASGU>
+                                    = strain_uncert(frac_test, conf_uncert, 'nye_melt', thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, tmp2, res_nye_melt_slice(ll)); %#ok<PFOUS,NASGU>
                             end
                             accum_ref ...
                                 = accum_nye_melt_slice(ll);
                         catch
                             ind_strain_fail_slice(ll) ...
-                                = 3; %#ok<AGROW>
+                                = 3;
                         end
                     end
                     
                     if do_strain(4)
                         try % Dansgaard-Johnsen model + basal melting
-                            [tmp1, res_dj_melt_slice(ll)] ...
-                                = fminsearch(@dj_melt_fit, [accum_ref thick_shear_slice(ll) melt_bed_slice(ll) frac_slide_def], opt, thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}); %#ok<AGROW>
+                            [tmp3, res_dj_melt_slice(ll)] ...
+                                = fminsearch(@dj_melt_fit, [accum_ref thick_shear_slice(ll) melt_bed_slice(ll) frac_slide_def], opt, thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}); %#ok<PFOUS>
                             [accum_dj_melt_slice(ll), thick_shear_melt_slice(ll), melt_bed_dj_slice(ll), frac_slide_slice(ll)] ...
-                                = deal(tmp1(1), tmp1(2), tmp1(3), tmp1(4)); %#ok<NASGU,AGROW>
+                                = deal(tmp3(1), tmp3(2), tmp3(3), tmp3(4)); %#ok<PFOUS,NASGU>
                             if do_uncert
                                 [accum_dj_melt_uncert_slice(:, ll), thick_shear_melt_uncert_slice(:, ll), melt_bed_dj_uncert_slice(:, ll), frac_slide_uncert_slice(:, ll)] ...
-                                    = strain_uncert(frac_test, conf_uncert, 'dj_melt', thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, tmp1, res_dj_melt_slice(ll)); %#ok<AGROW,NASGU>
+                                    = strain_uncert(frac_test, conf_uncert, 'dj_melt', thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, tmp3, res_dj_melt_slice(ll)); %#ok<PFOUS,NASGU>
                             end
                             accum_ref ...
                                 = accum_dj_melt_slice(ll);
                         catch
                             ind_strain_fail_slice(ll) ...
-                                = 4; %#ok<AGROW>
+                                = 4;
                         end
                     end
                     
@@ -362,24 +365,24 @@ for ii = 1:num_year
                         try % shallow strain model
                             if do_fix
                                 [accum_shallow_slice(ll), res_shallow_slice(ll)] ...
-                                    = fminsearch(@shallow_strain_fix, accum_ref, opt, depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, strain_rate_slice(ll)); %#ok<AGROW>
+                                    = fminsearch(@shallow_strain_fix, accum_ref, opt, depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, strain_rate_slice(ll)); %#ok<PFOUS>
                                 if do_uncert
                                     accum_shallow_uncert_slice(:, ll) ...
-                                        = strain_uncert(frac_test, conf_uncert, 'shallow_strain', thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, tmp1, res_shallow_slice(ll)); %#ok<AGROW>
+                                        = strain_uncert(frac_test, conf_uncert, 'shallow_strain', thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, accum_shallow_slice(ll), res_shallow_slice(ll)); %#ok<PFOUS>
                                 end
                             else
-                                [tmp1, res_shallow_slice(ll)] ...
-                                    = fminsearch(@shallow_strain_fit, [accum_ref (accum_ref / thick_slice(ll))], opt, depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}); %#ok<AGROW>
+                                [tmp4, res_shallow_slice(ll)] ...
+                                    = fminsearch(@shallow_strain_fit, [accum_ref (accum_ref / thick_slice(ll))], opt, depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll});
                                 [accum_shallow_slice(ll), strain_rate_slice(ll)] ...
-                                    = deal(tmp1(1), tmp1(2)); %#ok<AGROW>
+                                    = deal(tmp4(1), tmp4(2));
                                 if do_uncert
                                     [accum_shallow_uncert_slice(:, ll), strain_rate_uncert_slice(:, ll)] ...
-                                        = strain_uncert(frac_test, conf_uncert, 'shallow_strain', thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, tmp1, res_shallow_slice(ll)); %#ok<NASGU,AGROW>
+                                        = strain_uncert(frac_test, conf_uncert, 'shallow_strain', thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, tmp4, res_shallow_slice(ll)); %#ok<PFOUS,NASGU>
                                 end
                             end
                         catch
                             ind_strain_fail_slice(ll) ...
-                                = 5; %#ok<AGROW>
+                                = 5;
                         end
                     end
                 end
@@ -427,61 +430,61 @@ for ii = 1:num_year
                                 = accum_nye{ii}{jj}{kk}(ll);
                         catch
                             ind_strain_fail{ii}{jj}{kk}(:, ll) ...
-                                = [ll; 1]; %#ok<AGROW>
+                                = [ll; 1];
                         end
                     end
                     
                     if do_strain(2)
                         try % Dansgaard-Johnsen model (original)
-                            [tmp1, res_dj{ii}{jj}{kk}(ll)] ...
+                            [tmp5, res_dj{ii}{jj}{kk}(ll)] ...
                                 = fminsearch(@dj_fit, [accum_ref thick_shear_def], opt, thick_decim{ii}{jj}{kk}(ll), depth_smooth_decim(curr_layer, ll), age_trim(curr_layer), age_uncert_trim(curr_layer)); %#ok<AGROW>
                             [accum_dj{ii}{jj}{kk}(ll), thick_shear{ii}{jj}{kk}(ll)] ...
-                                = deal(tmp1(1), tmp1(2)); %#ok<AGROW>
+                                = deal(tmp5(1), tmp5(2)); %#ok<AGROW>
                             if do_uncert
                                 [accum_dj_uncert{ii}{jj}{kk}(:, ll), thick_shear_uncert{ii}{jj}{kk}(:, ll)] ...
-                                    = strain_uncert(frac_test, conf_uncert, 'dj', thick_decim{ii}{jj}{kk}(ll), depth_smooth_decim(curr_layer, ll), age_trim(curr_layer), age_uncert_trim(curr_layer), tmp1, res_dj{ii}{jj}{kk}(ll)); %#ok<AGROW,ASGLU>
+                                    = strain_uncert(frac_test, conf_uncert, 'dj', thick_decim{ii}{jj}{kk}(ll), depth_smooth_decim(curr_layer, ll), age_trim(curr_layer), age_uncert_trim(curr_layer), tmp5, res_dj{ii}{jj}{kk}(ll)); %#ok<AGROW,ASGLU>
                             end
                             accum_ref ...
                                 = accum_dj{ii}{jj}{kk}(ll);
                         catch
                             ind_strain_fail{ii}{jj}{kk}(:, ll) ...
-                                = [ll; 2]; %#ok<AGROW>
+                                = [ll; 2];
                         end
                     end
                     
                     if do_strain(3)
                         try % Nye + melt model
-                            [tmp1, res_nye_melt{ii}{jj}{kk}(ll)] ...
+                            [tmp6, res_nye_melt{ii}{jj}{kk}(ll)] ...
                                 = fminsearch(@nye_melt_fit, [accum_ref melt_rate_def], opt, thick_decim{ii}{jj}{kk}(ll), depth_smooth_decim(curr_layer, ll), age_trim(curr_layer), age_uncert_trim(curr_layer)); %#ok<AGROW>
                             [accum_nye_melt{ii}{jj}{kk}(ll), melt_bed{ii}{jj}{kk}(ll)] ...
-                                = deal(tmp1(1), tmp1(2)); %#ok<AGROW>
+                                = deal(tmp6(1), tmp6(2)); %#ok<AGROW>
                             if do_uncert
                                 [accum_nye_melt_uncert{ii}{jj}{kk}(:, ll), melt_bed_uncert{ii}{jj}{kk}(:, ll)] ...
-                                    = strain_uncert(frac_test, conf_uncert, 'nye_melt', thick_decim{ii}{jj}{kk}(ll), depth_smooth_decim(curr_layer, ll), age_trim(curr_layer), age_uncert_trim(curr_layer), tmp1, res_nye_melt{ii}{jj}{kk}(ll)); %#ok<AGROW,NASGU>
+                                    = strain_uncert(frac_test, conf_uncert, 'nye_melt', thick_decim{ii}{jj}{kk}(ll), depth_smooth_decim(curr_layer, ll), age_trim(curr_layer), age_uncert_trim(curr_layer), tmp6, res_nye_melt{ii}{jj}{kk}(ll)); %#ok<AGROW,NASGU>
                             end
                             accum_ref ...
                                 = accum_nye_melt{ii}{jj}{kk}(ll);
                         catch
                             ind_strain_fail{ii}{jj}{kk}(:, ll) ...
-                                = [ll; 3]; %#ok<AGROW>
+                                = [ll; 3];
                         end
                     end
                     
                     if do_strain(4)
                         try % Dansgaard-Johnsen model + basal melting
-                            [tmp1, res_dj_melt{ii}{jj}{kk}(ll)] ...
+                            [tmp7, res_dj_melt{ii}{jj}{kk}(ll)] ...
                                 = fminsearch(@dj_melt_fit, [accum_ref thick_shear{ii}{jj}{kk}(ll) melt_bed{ii}{jj}{kk}(ll) frac_slide_def], opt, thick_decim{ii}{jj}{kk}(ll), depth_smooth_decim(curr_layer, ll), age_trim(curr_layer), age_uncert_trim(curr_layer)); %#ok<AGROW>
                             [accum_dj_melt{ii}{jj}{kk}(ll), thick_shear_melt{ii}{jj}{kk}(ll), melt_bed_dj{ii}{jj}{kk}(ll), frac_slide{ii}{jj}{kk}(ll)] ...
-                                = deal(tmp1(1), tmp1(2), tmp1(3), tmp1(4)); %#ok<NASGU,AGROW>
+                                = deal(tmp7(1), tmp7(2), tmp7(3), tmp7(4)); %#ok<NASGU,AGROW>
                             if do_uncert
                                 [accum_dj_melt_uncert{ii}{jj}{kk}(:, ll), thick_shear_melt_uncert{ii}{jj}{kk}(:, ll), melt_bed_dj_uncert{ii}{jj}{kk}(:, ll), frac_slide_uncert{ii}{jj}{kk}(:, ll)] ...
-                                    = strain_uncert(frac_test, conf_uncert, 'dj_melt', thick_decim{ii}{jj}{kk}(ll), depth_smooth_decim(curr_layer, ll), age_trim(curr_layer), age_uncert_trim(curr_layer), tmp1, res_dj_melt{ii}{jj}{kk}(ll)); %#ok<NASGU,AGROW,ASGLU>
+                                    = strain_uncert(frac_test, conf_uncert, 'dj_melt', thick_decim{ii}{jj}{kk}(ll), depth_smooth_decim(curr_layer, ll), age_trim(curr_layer), age_uncert_trim(curr_layer), tmp7, res_dj_melt{ii}{jj}{kk}(ll)); %#ok<NASGU,AGROW,ASGLU>
                             end
                             accum_ref ...
                                 = accum_dj_melt{ii}{jj}{kk}(ll);
                         catch
                             ind_strain_fail{ii}{jj}{kk}(:, ll) ...
-                                = [ll; 4]; %#ok<AGROW>
+                                = [ll; 4];
                         end
                     end
                     
@@ -492,21 +495,21 @@ for ii = 1:num_year
                                     = fminsearch(@shallow_strain_fix, accum_ref, opt, depth_smooth_decim(curr_layer, ll), age_trim(curr_layer), age_uncert_trim(curr_layer), strain_rate_ref{ii}{jj}{kk}(ll)); %#ok<AGROW>
                                 if do_uncert
                                     accum_shallow_uncert{ii}{jj}{kk}(:, ll) ...
-                                        = strain_uncert(frac_test, conf_uncert, 'shallow_strain', thick_decim{ii}{jj}{kk}(ll), depth_smooth_decim(curr_layer, ll), age_trim(curr_layer), age_uncert_trim(curr_layer), tmp1, res_shallow{ii}{jj}{kk}(ll)); %#ok<AGROW>
+                                        = strain_uncert(frac_test, conf_uncert, 'shallow_strain', thick_decim{ii}{jj}{kk}(ll), depth_smooth_decim(curr_layer, ll), age_trim(curr_layer), age_uncert_trim(curr_layer), accum_shallow{ii}{jj}{kk}(ll), res_shallow{ii}{jj}{kk}(ll)); %#ok<AGROW>
                                 end
                             else
-                                [tmp1, res_shallow{ii}{jj}{kk}(ll)] ...
+                                [tmp8, res_shallow{ii}{jj}{kk}(ll)] ...
                                     = fminsearch(@shallow_strain_fit, [accum_ref (accum_ref / thick_decim{ii}{jj}{kk}(ll))], opt, depth_smooth_decim(curr_layer, ll), age_trim(curr_layer), age_uncert_trim(curr_layer)); %#ok<AGROW>
                                 [accum_shallow{ii}{jj}{kk}(ll), strain_rate{ii}{jj}{kk}(ll)] ...
-                                    = deal(tmp1(1), tmp1(2)); %#ok<NASGU,AGROW>
+                                    = deal(tmp8(1), tmp8(2)); %#ok<NASGU,AGROW>
                                 if do_uncert
                                     [accum_shallow_uncert{ii}{jj}{kk}(:, ll), strain_rate_uncert{ii}{jj}{kk}(:, ll)] ...
-                                        = strain_uncert(frac_test, conf_uncert, 'shallow_strain', thick_decim{ii}{jj}{kk}(ll), depth_smooth_decim(curr_layer, ll), age_trim(curr_layer), age_uncert_trim(curr_layer), tmp1, res_shallow{ii}{jj}{kk}(ll)); %#ok<AGROW,NASGU>
+                                        = strain_uncert(frac_test, conf_uncert, 'shallow_strain', thick_decim{ii}{jj}{kk}(ll), depth_smooth_decim(curr_layer, ll), age_trim(curr_layer), age_uncert_trim(curr_layer), tmp8, res_shallow{ii}{jj}{kk}(ll)); %#ok<AGROW,NASGU>
                                 end
                             end
                         catch
                             ind_strain_fail{ii}{jj}{kk}(:, ll) ...
-                                = [ll; 5]; %#ok<AGROW>
+                                = [ll; 5];
                         end
                     end
                 end
@@ -537,7 +540,9 @@ end
 % NaN out poor strain-rate model results
 if do_bad
     disp('Erasing results from known bad transect portions...')
-    trans2nan               = [4  7  6 75   77;
+    trans2nan               = [4  7  5 30   130;
+                               4  7  6 75   77;
+                               4  7  7 0    180;
                                5  1  6 2715 2730;
                                6  2  2 3181 3212;
                                6  7  4 2428 2432;
@@ -551,10 +556,9 @@ if do_bad
     load mat/merge_all dist
     for ii = 1:size(trans2nan, 1)
         ind2nan             = find((dist{trans2nan(ii, 1)}{trans2nan(ii, 2)}{trans2nan(ii, 3)}(ind_decim_mid{trans2nan(ii, 1)}{trans2nan(ii, 2)}{trans2nan(ii, 3)}) >= trans2nan(ii, 4)) & ...
-                                   (dist{trans2nan(ii, 1)}{trans2nan(ii, 2)}{trans2nan(ii, 3)}(ind_decim_mid{trans2nan(ii, 1)}{trans2nan(ii, 2)}{trans2nan(ii, 3)}) <= trans2nan(ii, 5))); ...
-                              %#ok<NASGU>
+                                   (dist{trans2nan(ii, 1)}{trans2nan(ii, 2)}{trans2nan(ii, 3)}(ind_decim_mid{trans2nan(ii, 1)}{trans2nan(ii, 2)}{trans2nan(ii, 3)}) <= trans2nan(ii, 5))); %#ok<NASGU>
         for jj = find(do_strain)
-            for kk = num_param(jj)
+            for kk = 1:num_param(jj)
                 eval([strain_param{jj}{kk} '{trans2nan(ii, 1)}{trans2nan(ii, 2)}{trans2nan(ii, 3)}(ind2nan) = NaN;'])
                 if do_uncert
                     eval([strain_param{jj}{kk} '_uncert{trans2nan(ii, 1)}{trans2nan(ii, 2)}{trans2nan(ii, 3)}(:, ind2nan) = NaN;'])
@@ -598,7 +602,7 @@ if do_grd
     [x_min, x_max, y_min, y_max] ...
                             = deal(-632, 846, -3344, -670);
     [x_tmp, y_tmp]          = deal(x_grd(((y_grd(:, 1) >= y_min) & (y_grd(:, 1) <= y_max)), ((x_grd(1, :) >= x_min) & (x_grd(1, :) <= x_max))), y_grd(((y_grd(:, 1) >= y_min) & (y_grd(:, 1) <= y_max)), ((x_grd(1, :) >= x_min) & (x_grd(1, :) <= x_max))));
-    [x_grd, y_grd]          = deal(x_tmp, y_tmp); %#ok<NASGU,ASGLU>
+    [x_grd, y_grd]          = deal(x_tmp, y_tmp); %#ok,ASGLU>
     
     for ii = find(do_strain)
         for jj = 1:num_param(ii)

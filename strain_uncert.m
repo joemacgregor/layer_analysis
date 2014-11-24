@@ -2,7 +2,7 @@ function varargout          = strain_uncert(frac_test, conf_bound, model, thick,
 % STRAIN_UNCERT Calculate parameter confidence bounds for a strain-rate model.
 % 
 % [PARAM1,PARAM2,...] = STRAIN_UNCERT(FRAC_TEST,CONF_BOUND,MODEL,THICK,DEPTH,AGE,AGE_UNCERT,MODEL_REF,RES_REF)
-% calculates the confidence bounds of 1D strain-rate model parameters.
+% calculates the confidence bounds for 1D ice-flow model parameters.
 % FRAC_TEST is the vector of fractions of the best-fit (i.e., reference)
 % model parameters about which to test, CONF_BOUND is the scalar desired
 % confidence-bound fraction (e.g., 95% or 0.95), MODEL is the string
@@ -13,8 +13,13 @@ function varargout          = strain_uncert(frac_test, conf_bound, model, thick,
 % parameters, RES_REF is the scalar chi-squared residual of the best-fit
 % model.
 % 
+% STRAIN_UNCERT is called by STRAIN_LAYERS when DO_UNCERT=TRUE.
+% 
+% See also DJ_FIT, DJ_MELT_FIT, NYE_FIT, NYE_MELT_FIT, SHALLOW_STRAIN_FIT
+% and STRAIN_LAYERS.
+% 
 % Joe MacGregor (UTIG)
-% Last updated: 10/07/14
+% Last updated: 10/08/14
 
 if (nargin ~= 9)
     error('strain_uncert:nargin', 'Incorrect number of input arguments (should be 9).')
