@@ -4,7 +4,7 @@
 %   deep ice-core sites and records this position if so.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 09/11/14
+% Last updated: 02/16/15
 
 clear
 
@@ -73,7 +73,7 @@ if do_core
                 end
             end
             
-            for kk = find(ind_fence{ii}{jj})
+            for kk = 1:length(ind_fence{ii}{jj})
                 [lat_merge_curr, lon_merge_curr] ...
                             = projinv(gimp_proj, (1e3 .* x_pk{ii}{jj}{kk}), (1e3 .* y_pk{ii}{jj}{kk}));
                 for ll = 1:num_core

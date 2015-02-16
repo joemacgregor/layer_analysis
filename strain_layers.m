@@ -21,7 +21,7 @@ function strain_layers(age_max, radar_type, do_strain, do_fix, do_uncert, do_bad
 % SMOOTH_LOWESS and STRAIN_UNCERT.
 % 
 % Joe MacGregor (UTIG), Mark Fahnestock (UAF)
-% Last updated: 10/15/14
+% Last updated: 01/12/15
 
 if ~exist('dj_fit', 'file')
     error('strain_layers:djfit', 'Function DJ_FIT is not available within this user''s path.')
@@ -51,7 +51,7 @@ if ~any(nargin == [9 10 11])
     error('strain_layers:nargin', ['Number of arguments (' num2str(nargin) ') is not 9, 10 or 11.'])
 end
 if (~ischar(radar_type) || ~any(strcmp(radar_type, {'deep' 'accum'})))
-    error('strain_layers:radar_type', 'RADAR_TYPE is not a string equal to ''deep'' or ''accum''.')    
+    error('strain_layers:radar_type', 'RADAR_TYPE is not a string equal to ''deep'' or ''accum''.')
 end
 if (~islogical(do_strain) || ~isvector(do_strain) || (length(do_strain) ~= 5) || ~any(do_strain))
     error('strain_layers:dostrain', 'DO_STRAIN is not a logical 5-element vector that contains at least one true value.')
@@ -693,8 +693,9 @@ if do_save
             end
         end
     end
-    eval(['save(''mat/strain_all_' num2str(1e-3 * age_max) 'ka.mat'', ''-v7.3'', ' var2save(1:(end - 1)) ')'])
-    disp(['Saved strain-rate modeling in mat/strain_all_' num2str(1e-3 * age_max) 'ka.mat.'])
+    name_save               = ['mat/strain_all_' num2str(1e-3 * age_max) 'ka.mat'];
+    eval(['save(' name_save ', ''-v7.3'', ' var2save(1:(end - 1)) ')'])
+    disp(['Saved strain-rate modeling in ' name_save '.'])
 end
 
 if parallel_check

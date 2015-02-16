@@ -1,7 +1,7 @@
 % DATE_LAYERS Date layers using ice-core depth/age scales and 1D/2D interpolation/extrapolation or quasi-Nye dating of overlapping dated layers.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 09/23/14
+% Last updated: 01/10/15
 
 clear
 
@@ -25,12 +25,12 @@ switch radar_type
         do_date             = true;
         do_age_check        = true;
         do_match            = [true true];
-        do_interp           = true;
+        do_interp           = false;
         interp_type         = 'quasi Nye';
-        do_save             = false;
+        do_save             = true;
         do_grd1             = false;
-        do_grd2             = true;
-        do_nye_norm         = true;
+        do_grd2             = false;
+        do_nye_norm         = false;
 end
 
 % variables of interest
@@ -90,13 +90,13 @@ switch radar_type
         load mat/xy_all_accum num_year num_trans name_year name_trans
         load mat/core_int_accum int_core_merge num_core name_core_short
         load mat/id_layer_master_accum_stable id_layer_master_mat
-        load mat/merge_all_accum depth_smooth dist ind_decim ind_decim_mid ind_fence num_decim num_fence num_layer num_trace_tot thick thick_decim x_pk y_pk
+        load mat/merge_all_accum depth_smooth dist ind_decim ind_decim_mid ind_fence num_decim num_layer num_trace_tot thick thick_decim x_pk y_pk
         load mat/range_resolution_accum range_resolution
     case 'deep'
         load mat/xy_all num_year num_trans name_year name_trans
         load mat/core_int int_core_merge num_core name_core_short
         load mat/id_layer_master_stable id_layer_master_mat
-        load mat/merge_all depth_smooth dist ind_decim ind_decim_mid ind_fence num_decim num_fence num_layer num_trace_tot thick thick_decim x_pk y_pk
+        load mat/merge_all depth_smooth dist ind_decim ind_decim_mid ind_fence num_decim num_layer num_trace_tot thick thick_decim x_pk y_pk
         load mat/range_resolution range_resolution
 end
 thick_trans                 = thick;
@@ -696,8 +696,8 @@ if do_date
                 save('mat/date_all_accum', '-v7.3', 'age', 'age_core', 'age_master', 'age_match', 'age_ord', 'age_n', 'age_range', 'age_type', 'age_uncert', 'age_uncert_rel_max', 'dist_int_max', 'layer_bin')
                 disp('Layer ages saved as mat/date_all_accum.mat.')
             case 'deep'
-%                 save('mat/date_all', '-v7.3', 'age', 'age_core', 'age_master', 'age_match', 'age_ord', 'age_n', 'age_range', 'age_type', 'age_uncert', 'age_uncert_rel_max', 'dist_int_max', 'layer_bin')
-                save('mat/date_all_ngrip_qnye', '-v7.3', 'age', 'age_core', 'age_uncert', 'age_type', 'dist_int_max')
+                save('mat/date_all_noqnye', '-v7.3', 'age', 'age_core', 'age_master', 'age_match', 'age_ord', 'age_n', 'age_range', 'age_type', 'age_uncert', 'age_uncert_rel_max', 'dist_int_max', 'layer_bin')
+%                 save('mat/date_all_ngrip_qnye', '-v7.3', 'age', 'age_core', 'age_uncert', 'age_type', 'dist_int_max')
                 disp('Layer ages saved as mat/date_all.mat.')
         end
     end
