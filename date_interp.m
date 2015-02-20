@@ -6,7 +6,7 @@ function [age, age_ord, age_n, age_range, age_type, age_uncert, date_counter, in
 % To be used within DATE_LAYERS only.
 %
 % Joe MacGregor
-% Last updated: 09/11/14
+% Last updated: 02/20/15
 
 % determine which traces are potentially usable because they have at least two dated layers
 ind_trace_usable            = find(sum(~isnan(depth(~isnan(age), :)), 1) > 1);
@@ -43,6 +43,10 @@ num_overlap_max             = length(ind_overlap);
 % initially include all depth and then whittle them down to the bounding layers
 [age_bound_tmp, age_uncert_bound_tmp, depth_bound_tmp, depth_curr, ind_overlap_bounded, thick_diff_max_curr, thick_overlap] ...
                             = deal(age(~isnan(age)), age_uncert(~isnan(age_uncert)), depth(~isnan(age), ind_overlap), depth(curr_layer, ind_overlap), false(1, num_overlap_max), (thick(ind_overlap) .* thick_diff_max), thick(ind_overlap));
+
+% if thickness unavailable, then set thickness criterion to infinity (rare for deep radar, always for accumulation radar)
+thick_diff_max_curr(isnan(thick_diff_max_curr)) ...
+                            = Inf;
 
 % sort dated layers by increasing depth
 [depth_bound_tmp, ind_depth_ord] ...
@@ -141,7 +145,10 @@ age_overlap(isinf(age_overlap) | (age_overlap < 0) | (age_overlap > age_max) | (
 age_overlap_mean            = nanmean(age_overlap, 2);
 
 % check if new age causes overturning
-if (do_age_check && ~age_check(age, curr_layer, age_overlap_mean, depth, curr_name))
+if isnan(age_overlap_mean)
+    ind_layer_blacklist     = [ind_layer_blacklist curr_layer];
+    return
+elseif (do_age_check && ~age_check(age, curr_layer, age_overlap_mean, depth, curr_name))
     ind_layer_blacklist     = [ind_layer_blacklist curr_layer];
     return
 end
