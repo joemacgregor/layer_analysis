@@ -1,7 +1,7 @@
 % ATTEN_LAYERS Radar attenuation-rate and inferred temperature from dated radar reflections.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 11/22/14
+% Last updated: 02/23/15
 
 clear
 
@@ -156,7 +156,7 @@ for ii = year_good
             % along-track azimuth
             if license('checkout', 'map_toolbox')
                 az_trans{ii}{jj}{kk} ...
-                            = azimuth(lat{ii}{jj}{kk}(ind_decim{ii}{jj}{kk}(1:(end - 1))), lon{ii}{jj}{kk}(ind_decim{ii}{jj}{kk}(1:(end - 1))), lat{ii}{jj}{kk}(ind_decim{ii}{jj}{kk}(2:end)), lon{ii}{jj}{kk}(ind_decim{ii}{jj}{kk}(2:end)));
+                            = azimuth(lat{ii}{jj}{kk}(ind_decim{ii}{jj}{kk}(1:(end - 1))), lon{ii}{jj}{kk}(ind_decim{ii}{jj}{kk}(1:(end - 1))), lat{ii}{jj}{kk}(ind_decim{ii}{jj}{kk}(2:end)), lon{ii}{jj}{kk}(ind_decim{ii}{jj}{kk}(2:end)), wgs84Ellipsoid);
             else
                 az_trans{ii}{jj}{kk} ...
                             = atan2d(diff(y_pk{ii}{jj}{kk}(ind_decim{ii}{jj}{kk})), diff(x_pk{ii}{jj}{kk}(ind_decim{ii}{jj}{kk})));
@@ -509,6 +509,9 @@ for ii = year_good
 %                     end
                 end
             end
+            
+            [atten_rate_curr(atten_rate_curr <= 0), atten_rate_uncert_curr(atten_rate_curr <= 0)] ...
+                                = deal(NaN);
             
             % redistribute sliced attenuation-rate and best-fit temperature
             [atten_rate{ii}{jj}{kk}(ind_good), atten_rate_uncert{ii}{jj}{kk}(ind_good), depth_kink{ii}{jj}{kk}(ind_good), flux_geo_robin{ii}{jj}{kk}(ind_good), mse_atten{ii}{jj}{kk}(ind_good), res_iso{ii}{jj}{kk}(ind_good), res_kink{ii}{jj}{kk}(ind_good), res_robin{ii}{jj}{kk}(ind_good), ...
