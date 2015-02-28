@@ -1,7 +1,7 @@
 % DATE_LAYERS Date layers using ice-core depth/age scales and 1D/2D interpolation/extrapolation or quasi-Nye dating of overlapping dated layers.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 01/10/15
+% Last updated: 02/28/15
 
 clear
 
@@ -115,21 +115,21 @@ switch radar_type
                             = false;
 end
 
-% if license('checkout', 'distrib_computing_toolbox')
-%     pool_check              = gcp('nocreate');
-%     if isempty(pool_check)
-%         try
-%             pool            = parpool('local', 4);
-%         catch
-%             pool            = parpool('local');
-%         end
-%     end
-%     num_pool                = pool.NumWorkers;
-%     parallel_check          = true;
-% else
+if license('checkout', 'distrib_computing_toolbox')
+    pool_check              = gcp('nocreate');
+    if isempty(pool_check)
+        try
+            pool            = parpool('local', 4);
+        catch
+            pool            = parpool('local');
+        end
+    end
+    num_pool                = pool.NumWorkers;
+    parallel_check          = true;
+else
     num_pool                = 0;
     parallel_check          = false;
-% end
+end
 
 % load core depth-age scales
 core                        = cell(1, num_core);
@@ -602,6 +602,23 @@ if do_date
                         disp([curr_name '...'])
                     end
                     
+                    % Nye strain rate
+                    if strcmp(interp_type, 'quasi Nye')
+                        accum_curr ...
+                                = interp2(x_grd, y_grd, accum, x_pk{ii}{jj}{kk}, y_pk{ii}{jj}{kk}, 'linear', NaN);
+                        strain_rate_curr ...
+                                = accum_curr ./ thick_trans{ii}{jj}{kk}; % start with Nye strain rate as initial guess
+                        ind_nothick ...
+                                = find(isnan(strain_rate_curr) | isinf(strain_rate_curr));
+                        if ~isempty(ind_nothick)
+                            strain_rate_curr(ind_nothick) ...
+                                = accum_curr(ind_nothick) ./ interp2(x_grd, y_grd, thick, x_pk{ii}{jj}{kk}(ind_nothick), y_pk{ii}{jj}{kk}(ind_nothick), 'linear', NaN);
+                        end
+                    else
+                        strain_rate_curr ...
+                                = [];
+                    end
+                    
                     % remember ages before attempting dating this time
                     age_old{ii}{jj}{kk} ...
                             = age{ii}{jj}{kk};
@@ -626,7 +643,7 @@ if do_date
                         while any(isnan(age{ii}{jj}{kk}(setdiff(ind_layer_undated, ind_layer_blacklist))))
                             [age{ii}{jj}{kk}, age_ord{ii}{jj}{kk}, age_n{ii}{jj}{kk}, age_range{ii}{jj}{kk}, age_type{ii}{jj}{kk}, age_uncert{ii}{jj}{kk}, date_counter, ind_layer_blacklist] ...
                                 = date_interp(depth_smooth{ii}{jj}{kk}, thick{ii}{jj}{kk}, age{ii}{jj}{kk}, age_ord{ii}{jj}{kk}, age_n{ii}{jj}{kk}, age_range{ii}{jj}{kk}, age_type{ii}{jj}{kk}, age_uncert{ii}{jj}{kk}, num_layer{ii}{jj}(kk), ind_layer_undated, ind_layer_blacklist, ...
-                                              thick_diff_max, layer_diff_max, curr_name, interp_type, parallel_check, num_pool, tol, iter_max, age_max, do_age_check, age_uncert_rel_max, date_counter, (num_date_loop + 1));
+                                              thick_diff_max, layer_diff_max, curr_name, interp_type, strain_rate_curr, parallel_check, num_pool, tol, iter_max, age_max, do_age_check, age_uncert_rel_max, date_counter, (num_date_loop + 1));
                         end
                         
                         % updated undated layer set

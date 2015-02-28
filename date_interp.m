@@ -1,12 +1,12 @@
 function [age, age_ord, age_n, age_range, age_type, age_uncert, date_counter, ind_layer_blacklist] ...
-                            = date_interp(depth, thick, age, age_ord, age_n, age_range, age_type, age_uncert, num_layer, ind_layer_undated, ind_layer_blacklist, thick_diff_max, layer_diff_max, curr_name, interp_type, parallel_check, num_pool, tol, iter_max, age_max, do_age_check, ...
-                                          age_uncert_rel_max, date_counter, age_type_assign)
+                            = date_interp(depth, thick, age, age_ord, age_n, age_range, age_type, age_uncert, num_layer, ind_layer_undated, ind_layer_blacklist, thick_diff_max, layer_diff_max, curr_name, interp_type, strain_rate_ref, parallel_check, num_pool, tol, iter_max, age_max, ...
+                                          do_age_check, age_uncert_rel_max, date_counter, age_type_assign)
 % DATE_INTERP Date an undated layer.
 %
 % To be used within DATE_LAYERS only.
 %
 % Joe MacGregor
-% Last updated: 02/20/15
+% Last updated: 02/28/15
 
 % determine which traces are potentially usable because they have at least two dated layers
 ind_trace_usable            = find(sum(~isnan(depth(~isnan(age), :)), 1) > 1);
@@ -123,15 +123,20 @@ switch interp_type
         
     case 'quasi Nye'
         
+        % reference/starting strain rate, supplemented with reference/Nye strain rate where necessary
+        strain_rate_curr    = -(diff(log(1 - (depth_bound ./ thick_overlap)))) / diff(age_bound);
+        strain_rate_curr(isnan(strain_rate_curr) | isinf(strain_rate_curr)) ...
+                            = strain_rate_ref(ind_overlap(ind_overlap_bounded(isnan(strain_rate_curr) | isinf(strain_rate_curr))));
+        
         if (parallel_check && (num_overlap_max >= (5 * num_pool)))
             parfor ii = 1:num_overlap_max
                 age_overlap(ii) ...
-                            = date_quasi_nye(depth_bound(:, ii), age_bound(:, ii), (-(diff(log(1 - (depth_bound(:, ii) ./ thick_overlap(ii))))) / diff(age_bound(:, ii))), depth_curr(ii), tol, iter_max, 'age');
+                            = date_quasi_nye(depth_bound(:, ii), age_bound(:, ii), strain_rate_curr(ii), depth_curr(ii), tol, iter_max, 'age');
             end
         else
             for ii = 1:num_overlap_max
                 age_overlap(ii) ...
-                            = date_quasi_nye(depth_bound(:, ii), age_bound(:, ii), (-(diff(log(1 - (depth_bound(:, ii) ./ thick_overlap(ii))))) / diff(age_bound(:, ii))), depth_curr(ii), tol, iter_max, 'age');
+                            = date_quasi_nye(depth_bound(:, ii), age_bound(:, ii), strain_rate_curr(ii), depth_curr(ii), tol, iter_max, 'age');
             end
         end
 end
