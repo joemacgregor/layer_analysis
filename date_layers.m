@@ -1,7 +1,7 @@
 % DATE_LAYERS Date layers using ice-core depth/age scales and 1D/2D interpolation/extrapolation or quasi-Nye dating of overlapping dated layers.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 02/28/15
+% Last updated: 03/03/15
 
 clear
 
@@ -607,12 +607,12 @@ if do_date
                         accum_curr ...
                                 = interp2(x_grd, y_grd, accum, x_pk{ii}{jj}{kk}, y_pk{ii}{jj}{kk}, 'linear', NaN);
                         strain_rate_curr ...
-                                = accum_curr ./ thick_trans{ii}{jj}{kk}; % start with Nye strain rate as initial guess
+                                = accum_curr ./ thick{ii}{jj}{kk}; % start with Nye strain rate as initial guess
                         ind_nothick ...
                                 = find(isnan(strain_rate_curr) | isinf(strain_rate_curr));
                         if ~isempty(ind_nothick)
                             strain_rate_curr(ind_nothick) ...
-                                = accum_curr(ind_nothick) ./ interp2(x_grd, y_grd, thick, x_pk{ii}{jj}{kk}(ind_nothick), y_pk{ii}{jj}{kk}(ind_nothick), 'linear', NaN);
+                                = accum_curr(ind_nothick) ./ interp2(x_grd, y_grd, thick_grd, x_pk{ii}{jj}{kk}(ind_nothick), y_pk{ii}{jj}{kk}(ind_nothick), 'linear', NaN);
                         end
                     else
                         strain_rate_curr ...

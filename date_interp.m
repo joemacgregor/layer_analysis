@@ -6,7 +6,7 @@ function [age, age_ord, age_n, age_range, age_type, age_uncert, date_counter, in
 % To be used within DATE_LAYERS only.
 %
 % Joe MacGregor
-% Last updated: 02/28/15
+% Last updated: 03/03/15
 
 % determine which traces are potentially usable because they have at least two dated layers
 ind_trace_usable            = find(sum(~isnan(depth(~isnan(age), :)), 1) > 1);
@@ -41,8 +41,8 @@ num_overlap_max             = length(ind_overlap);
                             = deal(NaN(2, num_overlap_max));
 
 % initially include all depth and then whittle them down to the bounding layers
-[age_bound_tmp, age_uncert_bound_tmp, depth_bound_tmp, depth_curr, ind_overlap_bounded, thick_diff_max_curr, thick_overlap] ...
-                            = deal(age(~isnan(age)), age_uncert(~isnan(age_uncert)), depth(~isnan(age), ind_overlap), depth(curr_layer, ind_overlap), false(1, num_overlap_max), (thick(ind_overlap) .* thick_diff_max), thick(ind_overlap));
+[age_bound_tmp, age_uncert_bound_tmp, depth_bound_tmp, depth_curr, ind_overlap_bounded, thick_diff_max_curr, thick_overlap, strain_rate_overlap] ...
+                            = deal(age(~isnan(age)), age_uncert(~isnan(age_uncert)), depth(~isnan(age), ind_overlap), depth(curr_layer, ind_overlap), false(1, num_overlap_max), (thick(ind_overlap) .* thick_diff_max), thick(ind_overlap), strain_rate_ref(ind_overlap));
 
 % if thickness unavailable, then set thickness criterion to infinity (rare for deep radar, always for accumulation radar)
 thick_diff_max_curr(isnan(thick_diff_max_curr)) ...
@@ -96,8 +96,8 @@ if isempty(find(ind_overlap_bounded, 1))
     ind_layer_blacklist     = [ind_layer_blacklist curr_layer];
     return
 elseif any(~ind_overlap_bounded)
-    [age_bound, age_uncert_bound, depth_bound, ind_overlap, depth_curr, thick_overlap] ...
-                            = deal(age_bound(:, ind_overlap_bounded), age_uncert_bound(:, ind_overlap_bounded), depth_bound(:, ind_overlap_bounded), ind_overlap(ind_overlap_bounded), depth_curr(ind_overlap_bounded), thick_overlap(ind_overlap_bounded));
+    [age_bound, age_uncert_bound, depth_bound, ind_overlap, depth_curr, thick_overlap, strain_rate_overlap] ...
+                            = deal(age_bound(:, ind_overlap_bounded), age_uncert_bound(:, ind_overlap_bounded), depth_bound(:, ind_overlap_bounded), ind_overlap(ind_overlap_bounded), depth_curr(ind_overlap_bounded), thick_overlap(ind_overlap_bounded), strain_rate_overlap(ind_overlap_bounded));
     num_overlap_max         = length(ind_overlap);
 end
 age_overlap                 = NaN(1, num_overlap_max);
@@ -124,9 +124,9 @@ switch interp_type
     case 'quasi Nye'
         
         % reference/starting strain rate, supplemented with reference/Nye strain rate where necessary
-        strain_rate_curr    = -(diff(log(1 - (depth_bound ./ thick_overlap)))) / diff(age_bound);
+        strain_rate_curr    = -(diff(log(1 - (depth_bound ./ thick_overlap(ones(2, 1), :))))) ./ diff(age_bound);
         strain_rate_curr(isnan(strain_rate_curr) | isinf(strain_rate_curr)) ...
-                            = strain_rate_ref(ind_overlap(ind_overlap_bounded(isnan(strain_rate_curr) | isinf(strain_rate_curr))));
+                            = strain_rate_overlap(isnan(strain_rate_curr) | isinf(strain_rate_curr));
         
         if (parallel_check && (num_overlap_max >= (5 * num_pool)))
             parfor ii = 1:num_overlap_max
