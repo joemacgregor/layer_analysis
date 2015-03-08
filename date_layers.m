@@ -1,7 +1,7 @@
 % DATE_LAYERS Date layers using ice-core depth/age scales and 1D/2D interpolation/extrapolation or quasi-Nye dating of overlapping dated layers.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 03/03/15
+% Last updated: 03/06/15
 
 clear
 
@@ -90,13 +90,13 @@ switch radar_type
         load mat/xy_all_accum num_year num_trans name_year name_trans
         load mat/core_int_accum int_core_merge num_core name_core_short
         load mat/id_layer_master_accum_stable id_layer_master_mat
-        load mat/merge_all_accum depth_smooth dist ind_decim ind_decim_mid ind_fence num_decim num_layer num_trace_tot thick thick_decim x_pk y_pk
+        load mat/merge_all_accum depth_smooth dist ind_decim ind_decim_mid num_decim num_layer num_subtrans num_trace_tot thick thick_decim x_pk y_pk
         load mat/range_resolution_accum range_resolution
     case 'deep'
         load mat/xy_all num_year num_trans name_year name_trans
         load mat/core_int int_core_merge num_core name_core_short
         load mat/id_layer_master_stable id_layer_master_mat
-        load mat/merge_all depth_smooth dist ind_decim ind_decim_mid ind_fence num_decim num_layer num_trace_tot thick thick_decim x_pk y_pk
+        load mat/merge_all depth_smooth dist ind_decim ind_decim_mid num_decim num_layer num_subtrans num_trace_tot thick thick_decim x_pk y_pk
         load mat/range_resolution range_resolution
 end
 thick_trans                 = thick;
@@ -150,7 +150,7 @@ letters                     = 'a':'z';
 % Greenland-centered, GIMP-projected 1-km grid
 [x_min, x_max, y_min, y_max]= deal(-632, 846, -3344, -670);
 
-if (do_grd1 || (do_grd2 && do_nye_norm))
+if (do_date || do_grd1 || (do_grd2 && do_nye_norm))
     load mat/greenland_cism accum x y
     [accum, x_cism, y_cism] = deal(double(accum), x, y);
     clear x y
@@ -171,7 +171,7 @@ if do_snr
             if isempty(snr_all{ii}{jj})
                 continue
             end
-            for kk = 1:length(ind_fence{ii}{jj})
+            for kk = 1:num_subtrans{ii}(jj)
                 if isempty(snr_all{ii}{jj}{kk})
                     continue
                 end
@@ -187,8 +187,8 @@ else
     for ii = 1:num_year
         snr_all{ii}         = deal(cell(1, num_trans(ii)));
         for jj = 1:num_trans(ii)
-            snr_all{ii}{jj} = cell(1, length(ind_fence{ii}{jj}));
-            for kk = 1:length(ind_fence{ii}{jj})
+            snr_all{ii}{jj} = cell(1, num_subtrans{ii}(jj));
+            for kk = 1:num_subtrans{ii}(jj)
                 snr_all{ii}{jj}{kk} ...
                             = snr_ref .* ones(num_layer{ii}{jj}(kk), num_core);
             end
@@ -208,8 +208,8 @@ if do_date
                             = deal(cell(1, num_trans(ii)));
         for jj = 1:num_trans(ii)
             [age{ii}{jj}, age_core{ii}{jj}, age_match{ii}{jj}, age_ord{ii}{jj}, age_n{ii}{jj}, age_range{ii}{jj}, age_type{ii}{jj}, age_uncert{ii}{jj}] ...
-                            = deal(cell(1, length(ind_fence{ii}{jj})));
-            for kk = 1:length(ind_fence{ii}{jj})
+                            = deal(cell(1, num_subtrans{ii}(jj)));
+            for kk = 1:num_subtrans{ii}(jj)
                 age_core{ii}{jj}{kk} ...
                             = NaN(num_layer{ii}{jj}(kk), num_core);
                 [age{ii}{jj}{kk}, age_match{ii}{jj}{kk}, age_ord{ii}{jj}{kk}, age_n{ii}{jj}{kk}, age_range{ii}{jj}{kk}, age_type{ii}{jj}{kk}, age_uncert{ii}{jj}{kk}] ...
@@ -408,7 +408,7 @@ if do_date
         for jj = 1:num_trans(ii)
             
             % loop through all merged picks file for current transect
-            for kk = 1:length(ind_fence{ii}{jj})
+            for kk = 1:num_subtrans{ii}(jj)
                 
                 % skip if no core intersection or if no core intersection with available depth-age scale
                 if isempty(ismember(int_core_merge(:, 1:3), [ii jj kk], 'rows'))
@@ -550,8 +550,8 @@ if do_date
     for ii = 1:num_year
         age_old{ii}         = cell(1, num_trans(ii));
         for jj = 1:num_trans(ii)
-            age_old{ii}{jj} = cell(1, length(ind_fence{ii}{jj}));
-            for kk = 1:length(ind_fence{ii}{jj})
+            age_old{ii}{jj} = cell(1, num_subtrans{ii}(jj));
+            for kk = 1:num_subtrans{ii}(jj)
                 age_old{ii}{jj}{kk} ...
                             = NaN(num_layer{ii}{jj}(kk), 1);
                 num_layer_dated_all ...
@@ -586,13 +586,13 @@ if do_date
             for jj = 1:num_trans(ii)
                 
                 % loop through all sub-transects for current transect
-                for kk = 1:length(ind_fence{ii}{jj})
+                for kk = 1:num_subtrans{ii}(jj)
                     
                     % move onto to next sub-transect if all or no layers were dated, or not enough dates, or no change from previous loop
                     if (~any(isnan(age{ii}{jj}{kk})) || all(isnan(age{ii}{jj}{kk})) || (length(find(~isnan(age{ii}{jj}{kk}))) < 2) || isempty(setdiff(find(~isnan(age{ii}{jj}{kk})), find(~isnan(age_old{ii}{jj}{kk})))))
                         continue
                     else
-                        if (length(ind_fence{ii}{jj}) == 1)
+                        if (num_subtrans{ii}(jj) == 1)
                             curr_name ...
                                 = name_trans{ii}{jj};
                         else
@@ -688,7 +688,7 @@ if do_date
         num_layer_dated_all = 0;
         for ii = 1:num_year
             for jj = 1:num_trans(ii)
-                for kk = 1:length(ind_fence{ii}{jj})
+                for kk = 1:num_subtrans{ii}(jj)
                     num_layer_dated_all ...
                             = num_layer_dated_all + length(find(~isnan(age{ii}{jj}{kk})));
                 end
@@ -760,10 +760,10 @@ if do_grd1
         for jj = 1:num_trans(ii)
             
             [age_diff1{ii}{jj}, age_norm1{ii}{jj}, age_uncert_norm1{ii}{jj}, depth_iso1{ii}{jj}, depth_norm_grd1{ii}{jj}, depth_uncert_iso1{ii}{jj}, dist_grd1{ii}{jj}] ...
-                            = deal(cell(1, length(ind_fence{ii}{jj})));
+                            = deal(cell(1, num_subtrans{ii}(jj)));
             
             % loop through all merged picks file for current transect
-            for kk = 1:length(ind_fence{ii}{jj})
+            for kk = 1:num_subtrans{ii}(jj)
                 
                 % dated layer indices
                 ind_layer_dated ...
@@ -1063,7 +1063,7 @@ if do_grd2
     % loop through each 1-D set and add its values to the mix
     for ii = 1:num_year
         for jj = 1:num_trans(ii)
-            for kk = 1:length(ind_fence{ii}{jj})
+            for kk = 1:num_subtrans{ii}(jj)
                 if ~isempty(age_norm1{ii}{jj}{kk})
                     [x_all_age_cat, y_all_age_cat] ...
                             = deal([x_all_age_cat; x_pk{ii}{jj}{kk}(ind_decim_mid{ii}{jj}{kk})'], [y_all_age_cat; y_pk{ii}{jj}{kk}(ind_decim_mid{ii}{jj}{kk})']);

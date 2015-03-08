@@ -21,7 +21,7 @@ function strain_layers(age_max, radar_type, do_strain, do_fix, do_uncert, do_bad
 % SMOOTH_LOWESS and STRAIN_UNCERT.
 % 
 % Joe MacGregor (UTIG), Mark Fahnestock (UAF)
-% Last updated: 01/12/15
+% Last updated: 03/06/15
 
 if ~exist('dj_fit', 'file')
     error('strain_layers:djfit', 'Function DJ_FIT is not available within this user''s path.')
@@ -99,11 +99,11 @@ disp('Starting strain-rate modeling...')
 switch radar_type
     case 'accum'
         load mat/xy_all_accum name_year name_trans num_year num_trans
-        load mat/merge_all_accum depth_smooth ind_decim ind_decim_mid ind_fence num_decim thick_decim x_pk y_pk
+        load mat/merge_all_accum depth_smooth ind_decim ind_decim_mid num_decim num_subtrans thick_decim x_pk y_pk
         load mat/date_all_accum age age_uncert
     case 'deep'
         load mat/xy_all name_year name_trans num_year num_trans
-        load mat/merge_all depth_smooth ind_decim ind_decim_mid ind_fence num_decim thick_decim x_pk y_pk
+        load mat/merge_all depth_smooth ind_decim ind_decim_mid num_decim num_subtrans thick_decim x_pk y_pk
         load mat/date_all age age_uncert
 end
 
@@ -178,17 +178,17 @@ for ii = 1:num_year
     end
     for jj = 1:num_trans(ii)
         for kk = 1:num_param_def
-            eval([strain_param_def{kk} '{ii}{jj} = cell(1, length(ind_fence{ii}{jj}));']);
+            eval([strain_param_def{kk} '{ii}{jj} = cell(1, num_subtrans{ii}(jj));']);
         end
         for kk = find(do_strain)
             for ll = 1:num_param(kk)
-                eval([strain_param{kk}{ll} '{ii}{jj} = cell(1, length(ind_fence{ii}{jj}));']);
+                eval([strain_param{kk}{ll} '{ii}{jj} = cell(1, num_subtrans{ii}(jj));']);
                 if do_uncert
-                    eval([strain_param{kk}{ll} '_uncert{ii}{jj} = cell(1, length(ind_fence{ii}{jj}));']);
+                    eval([strain_param{kk}{ll} '_uncert{ii}{jj} = cell(1, num_subtrans{ii}(jj));']);
                 end
             end
         end
-        for kk = 1:length(ind_fence{ii}{jj})
+        for kk = 1:num_subtrans{ii}(jj)
             for ll = 1:num_param_def
                 eval([strain_param_def{ll} '{ii}{jj}{kk} = NaN(1, num_decim{ii}{jj}(kk));']);
             end
@@ -215,7 +215,7 @@ for ii = 1:num_year
     
     for jj = 1:num_trans(ii)
         
-        for kk = 1:length(ind_fence{ii}{jj})
+        for kk = 1:num_subtrans{ii}(jj)
             
             if isempty(age{ii}{jj}{kk})
                 continue
@@ -574,7 +574,7 @@ if do_smooth
     disp('Smoothing strain-rate model parameters along-transect...')
     for ii = 1:num_year
         for jj = 1:num_trans(ii)
-            for kk = 1:length(ind_fence{ii}{jj})
+            for kk = 1:num_subtrans{ii}(jj)
                 for ll = find(do_strain)
                     for mm = 1:num_param(ll)
                         if any(~isnan(eval([strain_param{ll}{mm} '{ii}{jj}{kk}'])))
