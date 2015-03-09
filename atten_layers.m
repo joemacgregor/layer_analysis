@@ -1,7 +1,7 @@
 % ATTEN_LAYERS Radar attenuation-rate and inferred temperature from dated radar reflections.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 02/23/15
+% Last updated: 03/09/15
 
 clear
 
@@ -27,20 +27,13 @@ slope_max                   = 4; % maximum Doppler slope (deg)
 dist_decim                  = 1; % decimation distance, km
 slope_loss_max              = 10; % maximum correction for slope-induced power loss, dB
 envelope_bound              = [70 95]; % upper envelope bounds, %
-% freq_ref                    = 1e6 .* [(150 .* ones(1, 14)) (195 .* ones(1, 6))]; % radar center frequency, Hz
-% dist_stack                  = 10 .* ones(1, 20); % along-track stacking distance, m
-% num_stack                   = 1e3 .* ones(1, 20); % number of stack used in data, #
-% tol_robin                   = 1e-3; % residual tolerance of Robin [1955] temperature profile, K
-% depth_kink_rel              = 0.75; % default kink depth as a fraction of ice thickness
-% iter_max                    = 10; % maximum number of temperature iterations, #
 
 load mat/xy_all name_trans name_year num_trans num_year
-load mat/merge_all dist depth_smooth elev_air_gimp elev_smooth_gimp elev_surf_gimp ind_fence int_smooth lat lon num_layer thick twtt_smooth twtt_surf x_pk y_pk
+load mat/merge_all dist depth_smooth elev_air_gimp elev_smooth_gimp elev_surf_gimp int_smooth lat lon num_layer num_subtrans thick twtt_smooth twtt_surf x_pk y_pk
 load mat/date_all age
 load mat/core_int_temp int_core_merge
 load mat/grip_chem age_chem Cl H NH4
 load mat/post_pulse_comp_gain_corr gain_corr twtt_gain_corr
-% load mat/strain_all_9ka strain_rate
 
 if do_slope
     load mat/doppler_win doppler_bw doppler_win
@@ -64,37 +57,37 @@ opt.FunValCheck             = 'on'; % sometimes strain-rate models get complex/N
 
 [H_mean, Cl_mean, NH4_mean] = deal(mean(H), mean(Cl), mean(NH4));
 
-% if license('checkout', 'distrib_computing_toolbox')
-%     pool_check              = gcp('nocreate');
-%     if isempty(pool_check)
-%         try
-%             pool            = parpool('local', 4);
-%         catch
-%             pool            = parpool('local');
-%         end
-%     end
-%     parallel_check          = true;
-% else
+if license('checkout', 'distrib_computing_toolbox')
+    pool_check              = gcp('nocreate');
+    if isempty(pool_check)
+        try
+            pool            = parpool('local', 4);
+        catch
+            pool            = parpool('local');
+        end
+    end
+    parallel_check          = true;
+else
     parallel_check          = false;
-% end
+end
 
 % initialize numerous variables
 atten_core                  = [int_core_merge(:, 1:4) NaN(size(int_core_merge, 1), 8)];
 
-[atten_rate, atten_rate_uncert, az_trans, depth_bound_decim, depth_min_atten, depth_max_atten, depth_kink, flux_geo_robin, ind_decim, ind_decim_mid, ind_layer_int, int_smooth_corr, int_smooth_corr_uncert, mse_atten, num_decim, res_iso, res_kink, res_robin, slope_layer, temp_iso1, ...
- temp_iso1_uncert, temp_iso2, temp_grad_kink, thick_atten, thick_decim, Cl_trans, H_trans, NH4_trans] ...
+[atten_rate, atten_rate_uncert, az_trans, depth_bound_decim, depth_min_atten, depth_max_atten, depth_kink, flux_geo_robin, ind_decim, ind_decim_mid, ind_layer_int, int_smooth_corr, int_smooth_corr_uncert, mse_atten, num_decim, res_iso, res_kink, res_robin, slope_layer, temp_iso, ...
+ temp_iso_uncert, thick_atten, thick_decim, Cl_trans, H_trans, NH4_trans] ...
                             = deal(cell(1, num_year));
 for ii = year_good
     [atten_rate{ii}, atten_rate_uncert{ii}, az_trans{ii}, depth_bound_decim{ii}, depth_min_atten{ii}, depth_max_atten{ii}, depth_kink{ii}, flux_geo_robin{ii}, ind_decim{ii}, ind_decim_mid{ii}, ind_layer_int{ii}, int_smooth_corr{ii}, int_smooth_corr_uncert{ii}, mse_atten{ii}, num_decim{ii}, ...
-     res_iso{ii}, res_kink{ii}, res_robin{ii}, slope_layer{ii}, temp_iso1{ii}, temp_iso1_uncert{ii}, temp_iso2{ii}, temp_grad_kink{ii}, thick_atten{ii}, thick_decim{ii}, Cl_trans{ii}, H_trans{ii}, NH4_trans{ii}] ...
+     res_iso{ii}, res_kink{ii}, res_robin{ii}, slope_layer{ii}, temp_iso{ii}, temp_iso_uncert{ii}, thick_atten{ii}, thick_decim{ii}, Cl_trans{ii}, H_trans{ii}, NH4_trans{ii}] ...
                             = deal(cell(1, num_trans(ii)));
     for jj = 1:num_trans(ii)
         [atten_rate{ii}{jj}, atten_rate_uncert{ii}{jj}, az_trans{ii}{jj}, depth_bound_decim{ii}{jj}, depth_min_atten{ii}{jj}, depth_max_atten{ii}{jj}, depth_kink{ii}{jj}, flux_geo_robin{ii}{jj}, ind_decim{ii}{jj}, ind_decim_mid{ii}{jj}, ind_layer_int{ii}{jj}, int_smooth_corr{ii}{jj}, ...
-         int_smooth_corr_uncert{ii}{jj}, mse_atten{ii}{jj}, res_iso{ii}{jj}, res_kink{ii}{jj}, res_robin{ii}{jj}, slope_layer{ii}{jj}, temp_iso1{ii}{jj}, temp_iso1_uncert{ii}{jj}, temp_iso2{ii}{jj}, temp_grad_kink{ii}{jj}, thick_atten{ii}{jj}, thick_decim{ii}{jj}, Cl_trans{ii}{jj}, ...
+         int_smooth_corr_uncert{ii}{jj}, mse_atten{ii}{jj}, res_iso{ii}{jj}, res_kink{ii}{jj}, res_robin{ii}{jj}, slope_layer{ii}{jj}, temp_iso{ii}{jj}, temp_iso_uncert{ii}{jj}, thick_atten{ii}{jj}, thick_decim{ii}{jj}, Cl_trans{ii}{jj}, ...
          H_trans{ii}{jj}, NH4_trans{ii}{jj}] ...
-                            = deal(cell(1, length(ind_fence{ii}{jj})));
-        num_decim{ii}{jj}   = NaN(1, length(ind_fence{ii}{jj}));
-        for kk = 1:length(ind_fence{ii}{jj})
+                            = deal(cell(1, num_subtrans{ii}(jj)));
+        num_decim{ii}{jj}   = NaN(1, num_subtrans{ii}(jj));
+        for kk = 1:num_subtrans{ii}(jj)
             dist_int        = dist{ii}{jj}{kk}(1):dist_decim:dist{ii}{jj}{kk}(end);
             dist_int(end)   = dist{ii}{jj}{kk}(end);
             ind_decim{ii}{jj}{kk} ...
@@ -106,7 +99,7 @@ for ii = year_good
             [int_smooth_corr{ii}{jj}{kk}, int_smooth_corr_uncert{ii}{jj}{kk}, slope_layer{ii}{jj}{kk}] ...
                             = deal(NaN(num_layer{ii}{jj}(kk), num_decim{ii}{jj}(kk)));
             [atten_rate{ii}{jj}{kk}, atten_rate_uncert{ii}{jj}{kk}, az_trans{ii}{jj}{kk}, depth_kink{ii}{jj}{kk}, depth_min_atten{ii}{jj}{kk}, depth_max_atten{ii}{jj}{kk}, flux_geo_robin{ii}{jj}{kk},  mse_atten{ii}{jj}{kk}, res_iso{ii}{jj}{kk}, res_kink{ii}{jj}{kk}, res_robin{ii}{jj}{kk}, ...
-             temp_iso1{ii}{jj}{kk}, temp_iso1_uncert{ii}{jj}{kk}, temp_iso2{ii}{jj}{kk}, temp_grad_kink{ii}{jj}{kk}, thick_atten{ii}{jj}{kk}, thick_decim{ii}{jj}{kk}] ...
+             temp_iso{ii}{jj}{kk}, temp_iso_uncert{ii}{jj}{kk}, thick_atten{ii}{jj}{kk}, thick_decim{ii}{jj}{kk}] ...
                             = deal(NaN(1, num_decim{ii}{jj}(kk)));
             [depth_bound_decim{ii}{jj}{kk}, ind_layer_int{ii}{jj}{kk}, Cl_trans{ii}{jj}{kk}, H_trans{ii}{jj}{kk}, NH4_trans{ii}{jj}{kk}] ...
                             = deal(cell(1, num_decim{ii}{jj}(kk)));
@@ -119,7 +112,7 @@ if parallel_check
 else
     warning('off', 'MATLAB:lscov:RankDefDesignMat')
 end
-%%
+
 for ii = year_good
     
     disp(['Campaign: ' name_year{ii} '...'])
@@ -142,7 +135,7 @@ for ii = year_good
             end
         end
         
-        for kk = 1:length(ind_fence{ii}{jj})
+        for kk = 1:num_subtrans{ii}(jj)
             
             if (do_core && isempty(find(ismember(int_core_merge(:, 1:3), [ii jj kk], 'rows'), 1))) % require a core intersection
                 continue
@@ -293,8 +286,6 @@ for ii = year_good
                     slope_layer_doppler ...
                             = asind((sqrt(permitt_ice) * sind(atand(1e-3 .* slope_layer{ii}{jj}{kk}(:, ll))))) - atand(1e-3 * slope_surf_curr);%- atand(1e-3 * slope_air_curr);
                     for mm = find(~isnan(int_smooth_corr{ii}{jj}{kk}(:, ll)))'
-%                         int_smooth_corr{ii}{jj}{kk}(mm, ll)
-%                             = int_smooth_corr{ii}{jj}{kk}(mm, ll) - slope_loss(freq_ref(ii), speed_ice, dist_stack(ii), num_stack(ii), abs(atan(1e-3 .* slope_layer{ii}{jj}{kk}(mm, ll)))); % Holschuch et al. [2014]'s stacking fix
                         if (abs(interp1(angle_doppler_curr, loss_doppler_curr, slope_layer_doppler(mm), 'linear', 'extrap')) <= slope_loss_max) % don't let slope correction get too big
                             int_smooth_corr{ii}{jj}{kk}(mm, ll) ...
                                 = int_smooth_corr{ii}{jj}{kk}(mm, ll) - interp1(angle_doppler_curr, loss_doppler_curr, slope_layer_doppler(mm), 'linear', 'extrap');
@@ -398,34 +389,20 @@ for ii = year_good
                             = false;
                 ind_good    = ind_good_new;
             end
-            
-            % layer-inferred or Nye strain rate
-            strain_rate_curr= NaN(1, num_decim{ii}{jj}(kk));
-%             strain_rate_curr= strain_rate{ii}{jj}{kk};
-            if ~isempty(find(isnan(strain_rate_curr), 1))
-                strain_rate_curr(isnan(strain_rate_curr)) ...
-                            = accum_curr(isnan(strain_rate_curr)) ./ thick_decim{ii}{jj}{kk}(isnan(strain_rate_curr));
-            end
-            if ~isempty(find((ind_good & isnan(strain_rate_curr)), 1))
-                strain_rate_curr(isnan(strain_rate_curr)) ...
-                            = interp1(find(~isnan(strain_rate_curr)), strain_rate_curr(~isnan(strain_rate_curr)), find(ind_good & isnan(strain_rate_curr)), 'linear', 'extrap');
-            end
-            
+                       
             % slice key variables
-            [depth_inc_curr, depth_mid_curr, flux_geo_curr, loss_curr, loss_uncert_curr, num_layer_curr, strain_rate_curr, temp_surf_curr, thick_curr, H_curr, Cl_curr, NH4_curr] ...
-                            = deal(depth_inc_curr(ind_good), depth_mid_curr(ind_good), flux_geo_curr(ind_good), loss_curr(ind_good), loss_uncert_curr(ind_good), num_layer_curr(ind_good), strain_rate_curr(ind_good), temp_surf_curr(ind_good), thick_decim{ii}{jj}{kk}(ind_good), H_curr(ind_good), ...
+            [depth_inc_curr, depth_mid_curr, flux_geo_curr, loss_curr, loss_uncert_curr, num_layer_curr, temp_surf_curr, thick_curr, H_curr, Cl_curr, NH4_curr] ...
+                            = deal(depth_inc_curr(ind_good), depth_mid_curr(ind_good), flux_geo_curr(ind_good), loss_curr(ind_good), loss_uncert_curr(ind_good), num_layer_curr(ind_good), temp_surf_curr(ind_good), thick_decim{ii}{jj}{kk}(ind_good), H_curr(ind_good), ...
                                    Cl_curr(ind_good), NH4_curr(ind_good));
             ind_good        = find(ind_good);
             res_loss_best   = NaN(1, length(ind_good));
             
             % determine best-fit attenuation rate and equivalent temperature
-            [atten_rate_curr, atten_rate_uncert_curr, depth_kink_curr, flux_geo_robin_curr, mse_atten_curr, res_iso_curr, res_kink_curr, res_robin_curr, temp_iso1_curr, temp_iso1_uncert_curr, temp_iso2_curr, temp_grad_kink_curr] ...
+            [atten_rate_curr, atten_rate_uncert_curr, depth_kink_curr, flux_geo_robin_curr, mse_atten_curr, res_iso_curr, res_kink_curr, res_robin_curr, temp_iso_curr, temp_iso_uncert_curr] ...
                             = deal(NaN(1, length(ind_good)));
             
             if parallel_check
                 parfor ll = 1:length(ind_good)
-%                     atten_rate_tmp ...
-%                             = sum((cumsum(depth_inc_curr{ll}) .* loss_curr{ll}) ./ (loss_uncert_curr{ll} .^ 2)) / sum((cumsum(depth_inc_curr{ll}) ./ loss_uncert_curr{ll}) .^ 2);
                     [atten_rate_tmp, atten_rate_uncert_tmp, mse_atten_curr(ll)] ...
                             = lscov([ones(num_layer_curr(ll), 1) cumsum(depth_inc_curr{ll})], loss_curr{ll}, (1 ./ (loss_uncert_curr{ll} .^ 2)));
                     [atten_rate_curr(ll), atten_rate_uncert_curr(ll)] ...
@@ -433,42 +410,20 @@ for ii = year_good
                     if (isnan(atten_rate_curr(ll)) || (atten_rate_curr(ll) < 0))
                         continue
                     end
-%                     NaN_curr= NaN(length(depth_inc_curr{ll}), 1);
                     try
-                        [temp_iso1_curr(ll), res_iso_curr(ll)] ...
+                        [temp_iso_curr(ll), res_iso_curr(ll)] ...
                             = fminsearch(@atten_fit, temp_surf_curr(ll), opt, atten_rate_curr(ll), atten_rate_uncert_curr(ll), depth_inc_curr{ll}, H_curr{ll}, Cl_curr{ll}, NH4_curr{ll}, hfcondprop(hfcp_model));
-                        if ~isnan(temp_iso1_curr(ll))
-                            tmp = atten_bound(frac_test, conf_uncert, atten_rate_curr(ll), atten_rate_uncert_curr(ll), depth_inc_curr{ll}, H_curr{ll}, Cl_curr{ll}, NH4_curr{ll}, hfcondprop(hfcp_model), temp_iso1_curr(ll), res_iso_curr(ll));
-                            temp_iso1_uncert_curr(ll) ...
-                                = nanmean([(temp_iso1_curr(ll) - tmp(1)) (tmp(2) - temp_iso1_curr(ll))]);
+                        if ~isnan(temp_iso_curr(ll))
+                            tmp = atten_bound(frac_test, conf_uncert, atten_rate_curr(ll), atten_rate_uncert_curr(ll), depth_inc_curr{ll}, H_curr{ll}, Cl_curr{ll}, NH4_curr{ll}, hfcondprop(hfcp_model), temp_iso_curr(ll), res_iso_curr(ll));
+                            temp_iso_uncert_curr(ll) ...
+                                = nanmean([(temp_iso_curr(ll) - tmp(1)) (tmp(2) - temp_iso_curr(ll))]);
                         end
-%                             = atten_inv_gris(atten_rate_curr(ll), atten_rate_uncert_curr(ll), mean(H_curr{ll}), std(H_curr{ll}), mean(Cl_curr{ll}), std(Cl_curr{ll}), mean(NH4_curr{ll}), std(NH4_curr{ll}));
-%                         [temp_iso_curr2(ll), res_iso_curr(ll)] ...
-%                             = fminsearch(@loss_fit, temp_surf_curr(ll), opt, 'iso', temp_surf_curr(ll), [], depth_inc_curr{ll}, depth_mid_curr{ll}, H_curr{ll}, NaN_curr, Cl_curr{ll}, NaN_curr, NH4_curr{ll}, NaN_curr, loss_curr{ll}, loss_uncert_curr{ll});
                     catch
                         disp([num2str([ii jj kk ll]) ' failed iso...'])
                     end
-%                     try
-%                         [tmp, res_kink_curr(ll)] ...
-%                             = fminsearch(@loss_fit, [(depth_kink_rel * thick_curr(ll)) ((pmp(thick_curr(ll)) - temp_surf_curr(ll)) / (thick_curr(ll) * (1 - depth_kink_rel)))], opt, 'kink', temp_surf_curr(ll), [], depth_inc_curr{ll}, depth_mid_curr{ll}, H_curr{ll}, NaN_curr, Cl_curr{ll}, ...
-%                                          NaN_curr, NH4_curr{ll}, NaN_curr, loss_curr{ll}, loss_uncert_curr{ll});
-%                         [depth_kink_curr(ll), temp_grad_kink_curr(ll)] ...
-%                             = deal(tmp(1), tmp(2));
-%                     catch
-%                         disp([num2str([ii jj kk ll]) ' failed kink...'])
-%                     end
-%                     try
-%                         [flux_geo_robin_curr(ll), res_robin_curr(ll)] ...
-%                             = fminsearch(@loss_fit, flux_geo_curr(ll), opt, 'robin', temp_surf_curr(ll), [strain_rate_curr(ll) thick_curr(ll) tol_robin iter_max], depth_inc_curr{ll}, depth_mid_curr{ll}, H_curr{ll}, NaN_curr, Cl_curr{ll}, NaN_curr, NH4_curr{ll}, NaN_curr, loss_curr{ll}, ...
-%                                          loss_uncert_curr{ll});
-%                     catch
-%                         disp([num2str([ii jj kk ll]) ' failed robin...'])
-%                     end
                 end
             else
                 for ll = 1:length(ind_good)
-%                     atten_rate_tmp ...
-%                             = sum((cumsum(depth_inc_curr{ll}) .* loss_curr{ll}) ./ (loss_uncert_curr{ll} .^ 2)) / sum((cumsum(depth_inc_curr{ll}) ./ loss_uncert_curr{ll}) .^ 2);
                     [atten_rate_tmp, atten_rate_uncert_tmp, mse_atten_curr(ll)] ...
                             = lscov([ones(num_layer_curr(ll), 1) cumsum(depth_inc_curr{ll})], loss_curr{ll}, (1 ./ (loss_uncert_curr{ll} .^ 2)));
                     [atten_rate_curr(ll), atten_rate_uncert_curr(ll)] ...
@@ -476,37 +431,17 @@ for ii = year_good
                     if (isnan(atten_rate_curr(ll)) || (atten_rate_curr(ll) < 0))
                         continue
                     end
-%                     NaN_curr= NaN(length(depth_inc_curr{ll}), 1);
                     try
-                        [temp_iso1_curr(ll), res_iso_curr(ll)] ...
+                        [temp_iso_curr(ll), res_iso_curr(ll)] ...
                             = fminsearch(@atten_fit, temp_surf_curr(ll), opt, atten_rate_curr(ll), atten_rate_uncert_curr(ll), depth_inc_curr{ll}, H_curr{ll}, Cl_curr{ll}, NH4_curr{ll}, hfcondprop(hfcp_model));
-                        if ~isnan(temp_iso1_curr(ll))
-                            tmp = atten_bound(frac_test, conf_uncert, atten_rate_curr(ll), atten_rate_uncert_curr(ll), depth_inc_curr{ll}, H_curr{ll}, Cl_curr{ll}, NH4_curr{ll}, hfcondprop(hfcp_model), temp_iso1_curr(ll), res_iso_curr(ll));
-                            temp_iso1_uncert_curr(ll) ...
-                                = nanmean([(temp_iso1_curr(ll) - tmp(1)) (tmp(2) - temp_iso1_curr(ll))]);
+                        if ~isnan(temp_iso_curr(ll))
+                            tmp = atten_bound(frac_test, conf_uncert, atten_rate_curr(ll), atten_rate_uncert_curr(ll), depth_inc_curr{ll}, H_curr{ll}, Cl_curr{ll}, NH4_curr{ll}, hfcondprop(hfcp_model), temp_iso_curr(ll), res_iso_curr(ll));
+                            temp_iso_uncert_curr(ll) ...
+                                = nanmean([(temp_iso_curr(ll) - tmp(1)) (tmp(2) - temp_iso_curr(ll))]);
                         end
-%                             = atten_inv_gris(atten_rate_curr(ll), atten_rate_uncert_curr(ll), mean(H_curr{ll}), std(H_curr{ll}), mean(Cl_curr{ll}), std(Cl_curr{ll}), mean(NH4_curr{ll}), std(NH4_curr{ll}));
-%                         [temp_iso2_curr(ll), res_iso_curr(ll)] ...
-%                             = fminsearch(@loss_fit, temp_surf_curr(ll), opt, 'iso', temp_surf_curr(ll), [], depth_inc_curr{ll}, depth_mid_curr{ll}, H_curr{ll}, NaN_curr, Cl_curr{ll}, NaN_curr, NH4_curr{ll}, NaN_curr, loss_curr{ll}, loss_uncert_curr{ll});
                     catch
                         disp([num2str([ii jj kk ll]) ' failed iso...'])
                     end
-%                     try
-%                         [tmp, res_kink_curr(ll)] ...
-%                             = fminsearch(@loss_fit, [(depth_kink_rel * thick_decim(ll)) ((pmp(thick_decim(ll)) - temp_surf_curr(ll)) / (thick_decim(ll) * (1 - depth_kink_rel)))], opt, 'kink', temp_surf_curr(ll), [], depth_inc_curr{ll}, depth_mid_curr{ll}, H_curr{ll}, NaN_curr, Cl_curr{ll}, ...
-%                                          NaN_curr, NH4_curr{ll}, NaN_curr, loss_curr{ll}, loss_uncert_curr{ll});
-%                         [depth_kink_curr(ll), temp_grad_kink_curr(ll)] ...
-%                             = deal(tmp(1), tmp(2));
-%                     catch
-%                         disp([num2str([ii jj kk ll]) ' failed kink...'])
-%                     end
-%                     try
-%                         [flux_geo_robin_curr(ll), res_robin_curr(ll)] ...
-%                             = fminsearch(@loss_fit, flux_geo_curr(ll), opt, 'robin', temp_surf_curr(ll), [strain_rate_curr(ll) thick_decim(ll) tol_robin iter_max], depth_inc_curr{ll}, depth_mid_curr{ll}, H_curr{ll}, NaN_curr, Cl_curr{ll}, NaN_curr, NH4_curr{ll}, NaN_curr, loss_curr{ll}, ...
-%                                          loss_uncert_curr{ll});
-%                     catch
-%                         disp([num2str([ii jj kk ll]) ' failed robin...'])
-%                     end
                 end
             end
             
@@ -515,9 +450,8 @@ for ii = year_good
             
             % redistribute sliced attenuation-rate and best-fit temperature
             [atten_rate{ii}{jj}{kk}(ind_good), atten_rate_uncert{ii}{jj}{kk}(ind_good), depth_kink{ii}{jj}{kk}(ind_good), flux_geo_robin{ii}{jj}{kk}(ind_good), mse_atten{ii}{jj}{kk}(ind_good), res_iso{ii}{jj}{kk}(ind_good), res_kink{ii}{jj}{kk}(ind_good), res_robin{ii}{jj}{kk}(ind_good), ...
-             temp_iso1{ii}{jj}{kk}(ind_good), temp_iso1_uncert{ii}{jj}{kk}(ind_good), temp_iso2{ii}{jj}{kk}(ind_good), temp_grad_kink{ii}{jj}{kk}(ind_good), Cl_trans{ii}{jj}{kk}(ind_good), H_trans{ii}{jj}{kk}(ind_good), NH4_trans{ii}{jj}{kk}(ind_good)] ...
-                                = deal((1e3 .* atten_rate_curr), (1e3 .* atten_rate_uncert_curr), depth_kink_curr, (1e3 .* flux_geo_robin_curr), mse_atten_curr, res_iso_curr, res_kink_curr, res_robin_curr, (temp_iso1_curr - 273.15), temp_iso1_uncert_curr, (temp_iso2_curr - 273.15), ...
-                                       temp_grad_kink_curr, Cl_curr, H_curr, NH4_curr);
+             temp_iso{ii}{jj}{kk}(ind_good), temp_iso_uncert{ii}{jj}{kk}(ind_good), Cl_trans{ii}{jj}{kk}(ind_good), H_trans{ii}{jj}{kk}(ind_good), NH4_trans{ii}{jj}{kk}(ind_good)] ...
+                                = deal((1e3 .* atten_rate_curr), (1e3 .* atten_rate_uncert_curr), depth_kink_curr, (1e3 .* flux_geo_robin_curr), mse_atten_curr, res_iso_curr, res_kink_curr, res_robin_curr, (temp_iso_curr - 273.15), temp_iso_uncert_curr, Cl_curr, H_curr, NH4_curr);
             
             % record attenuation rate and temperature if interval intersects an ice core
             if isempty(ind_core_decim_curr)
@@ -526,13 +460,13 @@ for ii = year_good
             for mm = ind_core_decim_curr % loop through each decimated point
                 if ~isnan(atten_rate{ii}{jj}{kk}(mm))
                     atten_core(ind_core_full_curr(mm == ind_core_decim_curr), 5:12) ...
-                        = [mm atten_rate{ii}{jj}{kk}(mm) atten_rate_uncert{ii}{jj}{kk}(mm) temp_iso1{ii}{jj}{kk}(mm) temp_iso1_uncert{ii}{jj}{kk}(mm) temp_iso2{ii}{jj}{kk}(mm) depth_bound_decim{ii}{jj}{kk}{mm}([1 end])'];
+                        = [mm atten_rate{ii}{jj}{kk}(mm) atten_rate_uncert{ii}{jj}{kk}(mm) temp_iso{ii}{jj}{kk}(mm) temp_iso_uncert{ii}{jj}{kk}(mm) depth_bound_decim{ii}{jj}{kk}{mm}([1 end])'];
                 elseif ~isnan(atten_rate{ii}{jj}{kk}(mm - 1))
                     atten_core(ind_core_full_curr(mm == ind_core_decim_curr), 5:12) ...
-                        = [(mm - 1) atten_rate{ii}{jj}{kk}(mm - 1) atten_rate_uncert{ii}{jj}{kk}(mm - 1) temp_iso1{ii}{jj}{kk}(mm - 1) temp_iso1_uncert{ii}{jj}{kk}(mm - 1) temp_iso2{ii}{jj}{kk}(mm - 1) depth_bound_decim{ii}{jj}{kk}{mm - 1}([1 end])'];
+                        = [(mm - 1) atten_rate{ii}{jj}{kk}(mm - 1) atten_rate_uncert{ii}{jj}{kk}(mm - 1) temp_iso{ii}{jj}{kk}(mm - 1) temp_iso_uncert{ii}{jj}{kk}(mm - 1) depth_bound_decim{ii}{jj}{kk}{mm - 1}([1 end])'];
                 elseif ~isnan(atten_rate{ii}{jj}{kk}(mm + 1))
                     atten_core(ind_core_full_curr(mm == ind_core_decim_curr), 5:12) ...
-                        = [(mm + 1) atten_rate{ii}{jj}{kk}(mm + 1) atten_rate_uncert{ii}{jj}{kk}(mm + 1) temp_iso1{ii}{jj}{kk}(mm + 1) temp_iso1_uncert{ii}{jj}{kk}(mm + 1) temp_iso2{ii}{jj}{kk}(mm + 1) depth_bound_decim{ii}{jj}{kk}{mm + 1}([1 end])'];
+                        = [(mm + 1) atten_rate{ii}{jj}{kk}(mm + 1) atten_rate_uncert{ii}{jj}{kk}(mm + 1) temp_iso{ii}{jj}{kk}(mm + 1) temp_iso_uncert{ii}{jj}{kk}(mm + 1) depth_bound_decim{ii}{jj}{kk}{mm + 1}([1 end])'];
                 end
             end
         end
@@ -550,26 +484,26 @@ if do_save
     if do_core
         if (exp_geo == 2)
             save(['mat/atten_core_' hfcp_model], '-v7.3', 'atten_core', 'atten_rate', 'atten_rate_uncert', 'az_trans', 'az_diff_max', 'depth_bound_decim', 'depth_kink', 'depth_min', 'depth_min_atten', 'depth_max', 'depth_max_atten', 'hfcp_model', 'flux_geo_robin', 'ind_decim', 'ind_decim_mid', ...
-                                                          'ind_layer_int', 'int_smooth_corr', 'int_smooth_corr_uncert', 'num_layer_min', 'res_iso', 'res_kink', 'res_robin', 'slope_layer', 'temp_iso1', 'temp_iso1_uncert', 'temp_iso2', 'temp_grad_kink', 'thick_atten', 'thick_decim', 'thick_rel_min', ...
-                                                          'thick_rel_max', 'Cl_trans', 'H_trans', 'NH4_trans')
+                                                          'ind_layer_int', 'int_smooth_corr', 'int_smooth_corr_uncert', 'num_layer_min', 'res_iso', 'res_kink', 'res_robin', 'slope_layer', 'temp_iso', 'temp_iso_uncert', 'thick_atten', 'thick_decim', 'thick_rel_min', 'thick_rel_max', ...
+                                                          'Cl_trans', 'H_trans', 'NH4_trans')
             disp(['Saved attenuation-rate modeling as mat/atten_core_' hfcp_model '.mat.'])
         else
-            save(['mat/atten_core_' hfcp_model '_' num2str(exp_geo)], '-v7.3', 'atten_core', 'atten_rate', 'atten_rate_uncert', 'az_trans', 'az_diff_max', 'depth_bound_decim', 'depth_kink', 'depth_min', 'depth_min_atten', 'depth_max', 'depth_max_atten', 'hfcp_model', 'flux_geo_robin', 'ind_decim', ...
-                                                                               'ind_decim_mid', 'ind_layer_int', 'int_smooth_corr', 'int_smooth_corr_uncert', 'num_decim', 'num_layer_min', 'res_iso', 'res_kink', 'res_robin', 'slope_layer', 'temp_iso1', 'temp_iso1_uncert', 'temp_iso2', ...
-                                                                               'temp_grad_kink', 'thick_atten', 'thick_decim', 'thick_rel_min', 'thick_rel_max', 'Cl_trans', 'H_trans', 'NH4_trans')
+            save(['mat/atten_core_' hfcp_model '_' num2str(exp_geo)], '-v7.3', 'atten_core', 'atten_rate', 'atten_rate_uncert', 'az_trans', 'az_diff_max', 'depth_bound_decim', 'depth_kink', 'depth_min', 'depth_min_atten', 'depth_max', 'depth_max_atten', 'hfcp_model', 'flux_geo_robin', ...
+                                                                               'ind_decim', 'ind_decim_mid', 'ind_layer_int', 'int_smooth_corr', 'int_smooth_corr_uncert', 'num_decim', 'num_layer_min', 'res_iso', 'res_kink', 'res_robin', 'slope_layer', 'temp_iso', 'temp_iso_uncert', ...
+                                                                               'thick_atten', 'thick_decim', 'thick_rel_min', 'thick_rel_max', 'Cl_trans', 'H_trans', 'NH4_trans')
         end
     else
         if do_chem
             if (exp_geo == 2)
                 save mat/atten_all -v7.3 atten_core atten_rate atten_rate_uncert az_trans az_diff_max depth_bound_decim depth_kink depth_min depth_min_atten depth_max depth_max_atten hfcp_model flux_geo_robin ind_decim ind_decim_mid ind_layer_int int_smooth_corr int_smooth_corr_uncert ...
-                                         num_decim num_layer_min res_iso res_kink res_robin slope_layer temp_iso1 temp_iso1_uncert temp_iso2 temp_grad_kink thick_atten thick_decim thick_rel_min thick_rel_max Cl_trans H_trans NH4_trans
+                                         num_decim num_layer_min res_iso res_kink res_robin slope_layer temp_iso temp_iso_uncert thick_atten thick_decim thick_rel_min thick_rel_max Cl_trans H_trans NH4_trans
             else
                 save(['mat/atten_core_' hfcp_model '_' num2str(exp_geo)], '-v7.3', 'atten_core', 'atten_rate', 'atten_rate_uncert', 'az_trans', 'az_diff_max', 'depth_bound_decim', 'depth_kink', 'depth_min', 'depth_min_atten', 'depth_max', 'depth_max_atten', 'hfcp_model', 'flux_geo_robin', ...
-                                                                                   'ind_decim', 'ind_decim_mid', 'ind_layer_int', 'int_smooth_corr', 'int_smooth_corr_uncert', 'num_decim', 'num_layer_min', 'res_iso', 'res_kink', 'res_robin', 'slope_layer', 'temp_iso1', 'temp_iso1_uncert', ...
-                                                                                   'temp_iso2', 'temp_grad_kink', 'thick_atten', 'thick_decim', 'thick_rel_min', 'thick_rel_max', 'Cl_trans', 'H_trans', 'NH4_trans')
+                                                                                   'ind_decim', 'ind_decim_mid', 'ind_layer_int', 'int_smooth_corr', 'int_smooth_corr_uncert', 'num_decim', 'num_layer_min', 'res_iso', 'res_kink', 'res_robin', 'slope_layer', 'temp_iso', 'temp_iso_uncert', ...
+                                                                                   'thick_atten', 'thick_decim', 'thick_rel_min', 'thick_rel_max', 'Cl_trans', 'H_trans', 'NH4_trans')
             end
         else
-            save mat/atten_all_nochem -v7.3 temp_iso1
+            save mat/atten_all_nochem -v7.3 temp_iso
         end
         disp('Saved attenuation-rate modeling as mat/atten_all.mat.')
     end
