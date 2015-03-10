@@ -1,7 +1,7 @@
 % DATE_LAYERS Date layers using ice-core depth/age scales and 1D/2D interpolation/extrapolation or quasi-Nye dating of overlapping dated layers.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 03/06/15
+% Last updated: 03/09/15
 
 clear
 
@@ -25,12 +25,12 @@ switch radar_type
         do_date             = true;
         do_age_check        = true;
         do_match            = [true true];
-        do_interp           = false;
+        do_interp           = true;
         interp_type         = 'quasi Nye';
         do_save             = true;
-        do_grd1             = false;
-        do_grd2             = false;
-        do_nye_norm         = false;
+        do_grd1             = true;
+        do_grd2             = true;
+        do_nye_norm         = true;
 end
 
 % variables of interest
@@ -53,7 +53,8 @@ switch radar_type
         num_date_loop_max   = 10; % maximum number of dating loops
         age_max             = 1e4; % maximum permitted reflector age
         year_ord            = [1 2 3]; % order in which to analyze years/campaigns based on their overall data quality
-        num_gauss           = ones(1, 3);
+        num_gauss           = ones(1, 3); % number of Gaussians to use to fit Nye differences of normalized ages
+        core_avail          = true(1, 6); % cores to include in dating, following order in core names
     case 'deep'
         depth_uncert        = 10; % depth uncertainty representing unknown firn correction, m
         age_uncert_rel_max  = 0.25; % maximum relative age uncertainty
@@ -73,8 +74,7 @@ switch radar_type
         age_max             = 1.5e5; % maximum permitted reflector age, a
         year_ord            = [17 19 20 6 7 8 4 9 5 2 3 12 1 13 15 16 18 11 10 14]; % order in which to analyze years/campaigns based on their overall data quality
         num_gauss           = [ones(1, 15) (2 .* ones(1, 8)) 1]; % number of Gaussians to use to fit Nye differences of normalized ages
-        core_avail          = true(1, 6);
-%         core_avail          = [false(1, 5) true];
+        core_avail          = true(1, 6); % cores to include in dating, following order in core names
 end
 
 if strcmp(interp_type, 'quasi Nye')
@@ -713,7 +713,7 @@ if do_date
                 save('mat/date_all_accum', '-v7.3', 'age', 'age_core', 'age_master', 'age_match', 'age_ord', 'age_n', 'age_range', 'age_type', 'age_uncert', 'age_uncert_rel_max', 'dist_int_max', 'layer_bin')
                 disp('Layer ages saved as mat/date_all_accum.mat.')
             case 'deep'
-                save('mat/date_all_noqnye', '-v7.3', 'age', 'age_core', 'age_master', 'age_match', 'age_ord', 'age_n', 'age_range', 'age_type', 'age_uncert', 'age_uncert_rel_max', 'dist_int_max', 'layer_bin')
+                save('mat/date_all', '-v7.3', 'age', 'age_core', 'age_master', 'age_match', 'age_ord', 'age_n', 'age_range', 'age_type', 'age_uncert', 'age_uncert_rel_max', 'dist_int_max', 'layer_bin')
 %                 save('mat/date_all_ngrip_qnye', '-v7.3', 'age', 'age_core', 'age_uncert', 'age_type', 'dist_int_max')
                 disp('Layer ages saved as mat/date_all.mat.')
         end

@@ -2,26 +2,27 @@ function strain_layers(age_max, radar_type, do_strain, do_fix, do_uncert, do_bad
 % STRAIN_LAYERS 1-D ice-flow modeling using dated layers.
 % 
 % STRAIN_LAYERS(AGE_MAX,DATA_STR,DO_STRAIN,DO_FIX,DO_UNCERT,DO_BAD,DO_SMOOTH,DO_GRD,DO_SAVE,NUM_SMOOTH,STRAIN_RATE_REF)
-% calculates the best-fit parameters for several 1-D ice-flow models
-% using dated layers younger than or equal to AGE_MAX (units of years).
+% calculates the best-fit parameters for several 1-D ice-flow models using
+% dated layers younger than or equal to AGE_MAX (units of years).
 % RADAR_TYPE is a string that determines which radar dataset to analyze,
 % e.g., 'deep' or 'accum'. DO_STRAIN is a 5-element logical vector that
 % determines which models to run (true). The order is: Nye,
 % Dansgaard-Johnsen, Nye+melt, Dansgaard-Johnsen+melt, shallow strain.
 % DO_FIX, DO_UNCERT, DO_BAD, DO_SMOOTH, DO_GRD and DO_SAVE are logical
-% scalars that determine whether uncertainties are calculated, whether bad
-% traces are NaN'd out, whether the along-transect values are smoothed,
-% whether grids are calculated and whether the results are saved,
-% respectively. If DO_SMOOTH=TRUE, then the number of samples NUM_SMOOTH
-% over which to smooth the along-transect ice-flow model parameters must
-% also be given. If DO_FIX=TRUE, then a previously modeled vertical
-% strain rate is used instead.
+% scalars that determine whether the vertical strain rate is fixed in the
+% shallow strain model, uncertainties are calculated, whether bad traces
+% are NaN'd out, whether the along-transect values are smoothed, whether
+% grids are calculated and whether the results are saved, respectively. If
+% DO_SMOOTH=TRUE, then the number of samples NUM_SMOOTH over which to
+% smooth the along-transect ice-flow model parameters must also be given.
+% If DO_FIX=TRUE, then a previously modeled vertical strain rate is used
+% instead (STRAIN_RATE_REF).
 % 
 % See also DJ_FIT, DJ_MELT_FIT, NYE_FIT, NYE_MELT_FIT, SHALLOW_STRAIN_FIT,
 % SMOOTH_LOWESS and STRAIN_UNCERT.
 % 
 % Joe MacGregor (UTIG), Mark Fahnestock (UAF)
-% Last updated: 03/06/15
+% Last updated: 03/09/15
 
 if ~exist('dj_fit', 'file')
     error('strain_layers:djfit', 'Function DJ_FIT is not available within this user''s path.')
@@ -141,8 +142,7 @@ letters                     = 'a':'z';
 
 % set names of strain-rate model parameters
 strain_param_def            = {'accum_nye_start' 'ind_strain_fail' 'num_layer_strain'};
-strain_param                = {{'accum_nye' 'res_nye'} {'accum_dj' 'res_dj' 'shape_fact' 'thick_shear'} {'accum_nye_melt' 'melt_bed' 'res_nye_melt'} ...
-                               {'accum_dj_melt' 'frac_slide' 'melt_bed_dj' 'res_dj_melt' 'shape_fact_melt' 'thick_shear_melt'} {'accum_shallow' 'strain_rate' 'res_shallow'}};
+strain_param                = {{'accum_nye' 'res_nye'} {'accum_dj' 'res_dj' 'shape_fact' 'thick_shear'} {'accum_nye_melt' 'melt_bed' 'res_nye_melt'} {'accum_dj_melt' 'frac_slide' 'melt_bed_dj' 'res_dj_melt' 'shape_fact_melt' 'thick_shear_melt'} {'accum_shallow' 'strain_rate' 'res_shallow'}};
 if do_fix
     strain_param{5}         = strain_param{5}([1 3]);
 end
@@ -414,7 +414,7 @@ for ii = 1:num_year
                     num_layer_strain{ii}{jj}{kk}(ll) ...
                             = length(curr_layer); %#ok<AGROW,NASGU>
                     
-                    % LLA accumulation rate, i.e., Nye model
+                    % initial Nye accumulation rate
                     [accum_nye_start{ii}{jj}{kk}(ll), accum_ref] ...
                             = deal(mean(-log(1 - (depth_smooth_decim(curr_layer, ll) ./ thick_decim{ii}{jj}{kk}(ll))) .* (thick_decim{ii}{jj}{kk}(ll) ./ age_trim(curr_layer)))); %#ok<AGROW>
                         
@@ -538,21 +538,44 @@ for ii = 1:num_year
 end
 
 % NaN out poor strain-rate model results
-if do_bad
+if (strcmp(radar_type, 'deep') && do_bad)
     disp('Erasing results from known bad transect portions...')
-    trans2nan               = [4  7  5 30   130;
-                               4  7  6 75   77;
-                               4  7  7 0    180;
-                               5  1  6 2715 2730;
-                               6  2  2 3181 3212;
-                               6  7  4 2428 2432;
-                               6  8  3 4219 4240;
-                               6  11 4 4000 4020;
-                               9  4  1 2280 2360;
-                               11 6  1 1140 1261;
-                               12 8  1 2700 2710;
-                               19 51 2 3115 3130;
-                               20 4  2 2980 2985];
+    trans2nan               = [1  2   2 220  260;
+                               4  7   5 30   130;
+                               4  7   6 75   77;
+                               4  7   7 0    180;
+                               5  1   6 2715 2730;
+                               5  9   4 2292 2296;
+                               6  2   2 3181 3212;
+                               6  3   1 2885 2890;
+                               6  7   4 2428 2432;
+                               6  8   1 5043 5044;
+                               6  8   3 4219 4240;
+                               6  11  4 3840 3861;
+                               6  11  4 3885 4500;
+                               9  1   1 1810 1820;
+                               9  4   1 2280 2360;
+                               11 6   1 1140 1261;
+                               12 8   1 2700 2710;
+                               17 104 1 2341 2345;
+                               17 130 1 2110 2200;
+                               18 3   2 830  865;
+                               18 5   2 494  508;
+                               19 19  1 1268 1330;
+                               19 24  4 3750 3756;
+                               19 27  1 3500 3668;
+                               19 30  1 3750 3760;
+                               19 30  1 3852 3856;
+                               19 47  1 1010 1025;
+                               19 51  2 3115 3130;
+                               19 56  1 700  707;
+                               20 4   2 2980 2985;
+                               20 6   3 2200 2210;
+                               20 7   1 20   45;
+                               20 10  5 2295 2296;
+                               20 13  2 1376 1444;
+                               20 14  1 500  600;
+                               20 15  2 1576 1579];
     load mat/merge_all dist
     for ii = 1:size(trans2nan, 1)
         ind2nan             = find((dist{trans2nan(ii, 1)}{trans2nan(ii, 2)}{trans2nan(ii, 3)}(ind_decim_mid{trans2nan(ii, 1)}{trans2nan(ii, 2)}{trans2nan(ii, 3)}) >= trans2nan(ii, 4)) & ...
@@ -616,7 +639,7 @@ if do_grd
             end
             for kk = 1:num_year
                 for ll = 1:num_trans(kk)
-                    for mm = 1:length(ind_fence{kk}{ll})
+                    for mm = 1:num_subtrans{kk}(ll)
                         if isempty(eval([strain_param{ii}{jj} '{kk}{ll}{mm}']))
                             continue
                         end
@@ -694,7 +717,7 @@ if do_save
         end
     end
     name_save               = ['mat/strain_all_' num2str(1e-3 * age_max) 'ka.mat'];
-    eval(['save(' name_save ', ''-v7.3'', ' var2save(1:(end - 1)) ')'])
+    eval(['save(''' name_save ''', ''-v7.3'', ' var2save(1:(end - 1)) ')'])
     disp(['Saved strain-rate modeling in ' name_save '.'])
 end
 
