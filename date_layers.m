@@ -1,7 +1,7 @@
 % DATE_LAYERS Date layers using ice-core depth/age scales and 1D/2D interpolation/extrapolation or quasi-Nye dating of overlapping dated layers.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 03/09/15
+% Last updated: 03/13/15
 
 clear
 
@@ -115,6 +115,7 @@ switch radar_type
                             = false;
 end
 
+% start core pool if possible
 if license('checkout', 'distrib_computing_toolbox')
     pool_check              = gcp('nocreate');
     if isempty(pool_check)
@@ -425,7 +426,7 @@ if do_date
                 [age_uncert_depth, age_uncert_interp, age_uncert_radar] ...
                             = deal(NaN(num_layer{ii}{jj}(kk), num_core));
                 
-                for ll = size(ind_int_core, 1)
+                for ll = 1:size(ind_int_core, 1)
                     
                     % unique values of distance vector
                     [dist_curr, ind_sort] ...
