@@ -1,7 +1,7 @@
 % TRAVERSE_MERGE Extract merged layer data from melt/icebridge/data/.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 03/06/15
+% Last updated: 03/24/15
 
 clear
 
@@ -11,6 +11,9 @@ radar_type                  = 'accum';
 switch radar_type
     case 'accum'
         load mat/xy_all_accum num_year num_trans name_year name_trans
+        load mat/greenland_mc_bed_1km x_grd y_grd thick
+        thick_grd           = thick;
+        clear thick
     case 'deep'
         load mat/xy_all num_year num_trans name_year name_trans
 end
@@ -62,15 +65,23 @@ for ii = 1:num_year
             num_decim{ii}{jj}(1) ...
                             = length(ind_decim{ii}{jj}{1}) - 1;
             
-            thick_decim{ii}{jj}{1} ...
+            switch radar_type
+                case 'accum'
+                    thick{ii}{jj}{1} ...
+                            = interp2(x_grd, y_grd, thick_grd, x_pk{ii}{jj}{1}, y_pk{ii}{jj}{1}); % AR thickness is interpolated from grid, not measured directly
+                case 'deep'
+                    thick_decim{ii}{jj}{1} ...
                             = NaN(1, num_decim{ii}{jj}(1));
+            end
+            
+            % ice thickness at fixed intervals
             for ll = 1:num_decim{ii}{jj}(1)
                 thick_decim{ii}{jj}{1}(ll) ...
                             = nanmean(thick{ii}{jj}{1}(ind_decim{ii}{jj}{1}(ll):ind_decim{ii}{jj}{1}(ll + 1)));
             end
             
             num_subtrans{ii}(jj) ...
-                            = 1; % number of merge files for this transect           
+                            = 1; % number of merge files for this transect
             if isfield(pk, 'ind_layer') % only true if merge file has been reviewed through FENCEGUI
                 ind_layer{ii}{jj}{1} ...
                             = pk.ind_layer;
@@ -85,7 +96,7 @@ for ii = 1:num_year
                 ind_layer{ii}{jj}{1} ...
                             = [];
                 ind_fence{ii}{jj} ...
-                            = false;                
+                            = false;
             end
             
         else
@@ -109,7 +120,6 @@ for ii = 1:num_year
                             = elev_surf_gimp{ii}{jj}{kk} - elev_bed_gimp{ii}{jj}{kk};
                 thick{ii}{jj}{kk}(isinf(thick{ii}{jj}{kk})) ...
                             = NaN;
-                % indices to be kept (decimation vector)
                 dist_int    = dist{ii}{jj}{kk}(1):dist_int_decim:dist{ii}{jj}{kk}(end);
                 dist_int(end) ...
                             = dist{ii}{jj}{kk}(end);
@@ -120,9 +130,14 @@ for ii = 1:num_year
                 num_decim{ii}{jj}(kk) ...
                             = length(ind_decim{ii}{jj}{kk}) - 1;
                 
-                % ice thickness at fixed intervals
-                thick_decim{ii}{jj}{kk} ...
+                switch radar_type
+                    case 'accum'
+                        thick{ii}{jj}{kk} ...
+                            = interp2(x_grd, y_grd, thick_grd, x_pk{ii}{jj}{kk}, y_pk{ii}{jj}{kk});
+                    case 'deep'
+                        thick_decim{ii}{jj}{kk} ...
                             = NaN(1, num_decim{ii}{jj}(kk));
+                end
                 for ll = 1:num_decim{ii}{jj}(kk)
                     thick_decim{ii}{jj}{kk}(ll) ...
                             = nanmean(thick{ii}{jj}{kk}(ind_decim{ii}{jj}{kk}(ll):ind_decim{ii}{jj}{kk}(ll + 1)));

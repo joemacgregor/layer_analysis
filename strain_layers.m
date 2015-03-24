@@ -22,7 +22,7 @@ function strain_layers(age_max, radar_type, do_strain, do_fix, do_uncert, do_bad
 % SMOOTH_LOWESS and STRAIN_UNCERT.
 % 
 % Joe MacGregor (UTIG), Mark Fahnestock (UAF)
-% Last updated: 03/09/15
+% Last updated: 03/24/15
 
 if ~exist('dj_fit', 'file')
     error('strain_layers:djfit', 'Function DJ_FIT is not available within this user''s path.')
@@ -123,19 +123,11 @@ else
 end
 
 % initial strain-rate model parameters
-if any(do_strain([2 4]))
-    thick_shear_def         = 200; % initial basal shear layer thickness, m ("little h")
-end
-if any(do_strain([3 4]))
-    melt_rate_def           = 0; % initial basal melt rate, m/a
-end
-if do_strain(4)
-    frac_slide_def          = 0; % initial sliding fraction (dimensionless)
-end
-if do_uncert
-    frac_test               = [0.01 0.025 0.05 0.1 0.25 0.5 1 5 10]; % range around best-fit model parameter about which to test
-    conf_uncert             = 0.95; % confidence bound for uncertainty calculations, e.g., 0.95 is 95%
-end
+thick_shear_def             = 200; % initial basal shear layer thickness, m ("little h")
+melt_rate_def               = 0; % initial basal melt rate, m/a
+frac_slide_def              = 0; % initial sliding fraction (dimensionless)
+frac_test                   = [0.01 0.025 0.05 0.1 0.25 0.5 1 5 10]; % range around best-fit model parameter about which to test
+conf_uncert                 = 0.95; % confidence bound for uncertainty calculations, e.g., 0.95 is 95%
 
 % sub-transect letters
 letters                     = 'a':'z';
@@ -542,7 +534,7 @@ if (strcmp(radar_type, 'deep') && do_bad)
     disp('Erasing results from known bad transect portions...')
     trans2nan               = [1  2   2 220  260;
                                4  7   5 30   130;
-                               4  7   6 75   77;
+                               4  7   6 75   81;
                                4  7   7 0    180;
                                5  1   6 2715 2730;
                                5  9   4 2292 2296;
