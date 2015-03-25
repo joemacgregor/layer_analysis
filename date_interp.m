@@ -6,7 +6,7 @@ function [age, age_ord, age_n, age_range, age_type, age_uncert, date_counter, in
 % To be used within DATE_LAYERS only.
 %
 % Joe MacGregor
-% Last updated: 03/03/15
+% Last updated: 03/24/15
 
 % determine which traces are potentially usable because they have at least two dated layers
 ind_trace_usable            = find(sum(~isnan(depth(~isnan(age), :)), 1) > 1);
@@ -88,7 +88,7 @@ end
 if ~isempty(find((diff(age_bound) <= 0), 1))
     ind_overlap_bounded(diff(age_bound) <= 0) ...
                             = false;
-    disp([curr_name ' layer #' num2str(curr_layer) ' is sometimes badly age-bounded (' num2str(1e-3 * mean(diff(age_bound(:, (diff(age_bound) <= 0))))) ' ka mean top/bottom difference).'])
+    disp([curr_name ' layer #' num2str(curr_layer) ' is sometimes badly age-bounded (' num2str(1e-3 * mean(diff(age_bound(:, (diff(age_bound) <= 0))), 'omitnan')) ' ka mean top/bottom difference).'])
 end
 
 % remove unbounded or poorly dated traces
@@ -147,7 +147,7 @@ age_overlap(isinf(age_overlap) | (age_overlap < 0) | (age_overlap > age_max) | (
                             = NaN;
 
 % weighted mean
-age_overlap_mean            = nanmean(age_overlap, 2);
+age_overlap_mean            = mean(age_overlap, 2, 'omitnan');
 
 % check if new age causes overturning
 if isnan(age_overlap_mean)
@@ -159,7 +159,7 @@ elseif (do_age_check && ~age_check(age, curr_layer, age_overlap_mean, depth, cur
 end
 
 % weighted uncertainty as the sum of uncertainties of both bounding layers
-age_overlap_uncert          = sqrt(nanvar(age_overlap) + nanmean(nanmean((age_uncert_bound .^ 2), 1), 2));
+age_overlap_uncert          = sqrt(var(age_overlap, 'omitnan') + mean(mean((age_uncert_bound .^ 2), 1, 'omitnan'), 2, 'omitnan'));
 
 % limit age assignment to well-constrained layers
 if (isempty(find(~isnan(age_overlap), 1)) || ((age_overlap_uncert / age_overlap_mean) > age_uncert_rel_max) || (age_overlap_mean <= 0))

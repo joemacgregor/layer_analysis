@@ -226,7 +226,7 @@ for ii = 1:num_year
                             = NaN(length(ind_layer_good), num_decim{ii}{jj}(kk));
             for ll = 1:num_decim{ii}{jj}(kk)
                 depth_smooth_decim(:, ll) ...
-                            = nanmean(depth_smooth{ii}{jj}{kk}(ind_layer_good, ind_decim{ii}{jj}{kk}(ll):ind_decim{ii}{jj}{kk}(ll + 1)), 2);
+                            = mean(depth_smooth{ii}{jj}{kk}(ind_layer_good, ind_decim{ii}{jj}{kk}(ll):ind_decim{ii}{jj}{kk}(ll + 1)), 2, 'omitnan');
             end
             
             % set uncertainty of core-matched layers to mean relative age uncertainty of overlapping layers
