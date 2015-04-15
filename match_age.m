@@ -5,10 +5,11 @@ function [age_master, age_core, age, age_uncert, age_range, age_n, age_type, age
 % To be used within DATE_LAYERS only.
 % 
 % Joe MacGregor
-% Last updated: 05/07/14
+% Last updated: 08/18/14
 
 % loop through master layers to consider
 for ii = ind_layer_curr
+    
     age_cat                 = [];
     id                      = layer_bin{ii};
     id(~id(:, 3), 3)        = 1;
@@ -37,7 +38,7 @@ for ii = ind_layer_curr
         age_master_tmp(num_core + 1) ...
                             = nanmean(age_master_tmp(1:num_core));
         age_master_tmp(num_core + 2) ...
-                            = nanmean(age_cat(:, (num_core + 1)));                        
+                            = nanmean(age_cat(:, (num_core + 1)));
         age_master_tmp(num_core + 3) ...
                             = range(age_cat(:, (num_core + 1)));
     else

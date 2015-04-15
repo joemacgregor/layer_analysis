@@ -22,7 +22,7 @@ function strain_layers(age_max, radar_type, do_strain, do_fix, do_uncert, do_bad
 % SMOOTH_LOWESS and STRAIN_UNCERT.
 % 
 % Joe MacGregor (UTIG), Mark Fahnestock (UAF)
-% Last updated: 03/24/15
+% Last updated: 03/27/15
 
 if ~exist('dj_fit', 'file')
     error('strain_layers:djfit', 'Function DJ_FIT is not available within this user''s path.')
@@ -708,7 +708,12 @@ if do_save
             end
         end
     end
-    name_save               = ['mat/strain_all_' num2str(1e-3 * age_max) 'ka.mat'];
+    switch radar_type
+        case 'accum'
+            name_save       = ['mat/strain_all_' num2str(1e-3 * age_max) 'ka_accum.mat'];
+        case 'deep'
+            name_save       = ['mat/strain_all_' num2str(1e-3 * age_max) 'ka.mat'];
+    end
     eval(['save(''' name_save ''', ''-v7.3'', ' var2save(1:(end - 1)) ')'])
     disp(['Saved strain-rate modeling in ' name_save '.'])
 end

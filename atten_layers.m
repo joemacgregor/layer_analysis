@@ -29,7 +29,7 @@ function atten_layers(hfcp_model, do_set, year_good, dist_decim, depth_range, th
 % 95%, 0.68 ~ 1 sigma.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 03/23/15
+% Last updated: 04/14/15
 
 if (nargin ~= 14)
     error('atten_layers:nargin', 'Incorrect number of arguments (must be 14).')
@@ -37,7 +37,7 @@ end
 if ~ischar(hfcp_model)
     error('atten_layers:hfcp_model', 'HFCP_MODEL is not a string.')
 elseif ~any(strcmp(hfcp_model, {'M07-std' 'M07-adj' 'M07-adj-NH4' 'M07-wt' 'W97' 'W97-adj'}))
-    error('atten_layers:hfcp_model_type', 'HFCP_MODEL must be either ''M07-std'', ''M07-adj'', ''M07-adj-NH4'', ''M07-wt'', ''W97'', ''W97-adj''.')
+    error('atten_layers:hfcp_model_type', 'HFCP_MODEL must be either ''M07-std'', ''M07-adj'', ''M07-adj-NH4'', ''M07-wt'', ''W97'' or ''W97-adj''.')
 end
 if (~islogical(do_set) || ~isvector(do_set) || (length(do_set) ~= 5))
     error('atten_layers:do_set', 'DO_SET must be a 5-element logical vector.')
@@ -132,18 +132,18 @@ else
 end
 
 % initialize numerous variables
-atten_core                  = [int_core_merge(:, 1:4) NaN(size(int_core_merge, 1), 8)];
+atten_core                  = [int_core_merge(:, 1:4) NaN(size(int_core_merge, 1), 7)];
 
-[atten_rate, atten_rate_uncert, az_trans, depth_bound_decim, depth_min_atten, depth_max_atten, ind_decim, ind_decim_mid, ind_layer_int, int_smooth_corr, int_smooth_corr_uncert, mse_atten, num_decim, res_iso, slope_layer, temp_iso, ...
- temp_iso_uncert, thick_atten, thick_decim, Cl_trans, H_trans, NH4_trans] ...
+[atten_rate, atten_rate_uncert, az_trans, depth_bound_decim, depth_min_atten, depth_max_atten, ind_decim, ind_decim_mid, ind_layer_int, int_smooth_corr, int_smooth_corr_uncert, mse_atten, num_decim, res_iso, slope_layer, temp_iso, temp_iso_uncert, thick_atten, thick_decim, Cl_trans, H_trans, ...
+ NH4_trans] ...
                             = deal(cell(1, num_year));
 for ii = year_good
-    [atten_rate{ii}, atten_rate_uncert{ii}, az_trans{ii}, depth_bound_decim{ii}, depth_min_atten{ii}, depth_max_atten{ii}, ind_decim{ii}, ind_decim_mid{ii}, ind_layer_int{ii}, int_smooth_corr{ii}, int_smooth_corr_uncert{ii}, mse_atten{ii}, num_decim{ii}, ...
-     res_iso{ii}, slope_layer{ii}, temp_iso{ii}, temp_iso_uncert{ii}, thick_atten{ii}, thick_decim{ii}, Cl_trans{ii}, H_trans{ii}, NH4_trans{ii}] ...
+    [atten_rate{ii}, atten_rate_uncert{ii}, az_trans{ii}, depth_bound_decim{ii}, depth_min_atten{ii}, depth_max_atten{ii}, ind_decim{ii}, ind_decim_mid{ii}, ind_layer_int{ii}, int_smooth_corr{ii}, int_smooth_corr_uncert{ii}, mse_atten{ii}, num_decim{ii}, res_iso{ii}, slope_layer{ii}, ...
+     temp_iso{ii}, temp_iso_uncert{ii}, thick_atten{ii}, thick_decim{ii}, Cl_trans{ii}, H_trans{ii}, NH4_trans{ii}] ...
                             = deal(cell(1, num_trans(ii)));
     for jj = 1:num_trans(ii)
-        [atten_rate{ii}{jj}, atten_rate_uncert{ii}{jj}, az_trans{ii}{jj}, depth_bound_decim{ii}{jj}, depth_min_atten{ii}{jj}, depth_max_atten{ii}{jj}, ind_decim{ii}{jj}, ind_decim_mid{ii}{jj}, ind_layer_int{ii}{jj}, int_smooth_corr{ii}{jj}, ...
-         int_smooth_corr_uncert{ii}{jj}, mse_atten{ii}{jj}, res_iso{ii}{jj}, slope_layer{ii}{jj}, temp_iso{ii}{jj}, temp_iso_uncert{ii}{jj}, thick_atten{ii}{jj}, thick_decim{ii}{jj}, Cl_trans{ii}{jj}, H_trans{ii}{jj}, NH4_trans{ii}{jj}] ...
+        [atten_rate{ii}{jj}, atten_rate_uncert{ii}{jj}, az_trans{ii}{jj}, depth_bound_decim{ii}{jj}, depth_min_atten{ii}{jj}, depth_max_atten{ii}{jj}, ind_decim{ii}{jj}, ind_decim_mid{ii}{jj}, ind_layer_int{ii}{jj}, int_smooth_corr{ii}{jj}, int_smooth_corr_uncert{ii}{jj}, mse_atten{ii}{jj}, ...
+         res_iso{ii}{jj}, slope_layer{ii}{jj}, temp_iso{ii}{jj}, temp_iso_uncert{ii}{jj}, thick_atten{ii}{jj}, thick_decim{ii}{jj}, Cl_trans{ii}{jj}, H_trans{ii}{jj}, NH4_trans{ii}{jj}] ...
                             = deal(cell(1, num_subtrans{ii}(jj)));
         num_decim{ii}{jj}   = NaN(1, num_subtrans{ii}(jj));
         for kk = 1:num_subtrans{ii}(jj)
@@ -157,8 +157,7 @@ for ii = year_good
                             = length(ind_decim{ii}{jj}{kk}) - 1;
             [int_smooth_corr{ii}{jj}{kk}, int_smooth_corr_uncert{ii}{jj}{kk}, slope_layer{ii}{jj}{kk}] ...
                             = deal(NaN(num_layer{ii}{jj}(kk), num_decim{ii}{jj}(kk)));
-            [atten_rate{ii}{jj}{kk}, atten_rate_uncert{ii}{jj}{kk}, az_trans{ii}{jj}{kk}, depth_min_atten{ii}{jj}{kk}, depth_max_atten{ii}{jj}{kk},  mse_atten{ii}{jj}{kk}, res_iso{ii}{jj}{kk}, ...
-             temp_iso{ii}{jj}{kk}, temp_iso_uncert{ii}{jj}{kk}, thick_atten{ii}{jj}{kk}, thick_decim{ii}{jj}{kk}] ...
+            [atten_rate{ii}{jj}{kk}, atten_rate_uncert{ii}{jj}{kk}, az_trans{ii}{jj}{kk}, depth_min_atten{ii}{jj}{kk}, depth_max_atten{ii}{jj}{kk},  mse_atten{ii}{jj}{kk}, res_iso{ii}{jj}{kk}, temp_iso{ii}{jj}{kk}, temp_iso_uncert{ii}{jj}{kk}, thick_atten{ii}{jj}{kk}, thick_decim{ii}{jj}{kk}] ...
                             = deal(NaN(1, num_decim{ii}{jj}(kk)));
             [depth_bound_decim{ii}{jj}{kk}, ind_layer_int{ii}{jj}{kk}, Cl_trans{ii}{jj}{kk}, H_trans{ii}{jj}{kk}, NH4_trans{ii}{jj}{kk}] ...
                             = deal(cell(1, num_decim{ii}{jj}(kk)));
@@ -293,14 +292,14 @@ for ii = year_good
                 ind_curr    = ind_decim{ii}{jj}{kk}(ll):ind_decim{ii}{jj}{kk}(ll + 1);
                 
                 thick_decim{ii}{jj}{kk}(ll) ...
-                            = nanmean(thick{ii}{jj}{kk}(ind_curr));
+                            = mean(thick{ii}{jj}{kk}(ind_curr), 'omitnan');
                 if isnan(thick_decim{ii}{jj}{kk}(ll))
                     continue
                 end
                 
                 % smoothed layer depths
                 depth_smooth_decim(:, ll) ...
-                            = nanmean(depth_smooth{ii}{jj}{kk}(:, ind_curr), 2);
+                            = mean(depth_smooth{ii}{jj}{kk}(:, ind_curr), 2, 'omitnan');
                 
                 % layer slope at fixed intervals
                 for mm = 1:num_layer{ii}{jj}(kk)
@@ -323,13 +322,13 @@ for ii = year_good
                         int_smooth_corr{ii}{jj}{kk}(mm, ll) ...
                             = 1e1 .* log10(mean(int_smooth_set));
                         int_smooth_corr_uncert{ii}{jj}{kk}(mm, ll) ...
-                            = nanstd((1e1 .* log10(int_smooth_set)), 0, 2);
+                            = std((1e1 .* log10(int_smooth_set)), 0, 2, 'omitnan');
                     end
                 else % straight average
                     int_smooth_corr{ii}{jj}{kk}(:, ll) ...
-                            = 1e1 .* log10(nanmean((1e1 .^ (1e-1 .* int_smooth_corr_full(:, ind_curr))), 2));
+                            = 1e1 .* log10(mean((1e1 .^ (1e-1 .* int_smooth_corr_full(:, ind_curr))), 2, 'omitnan'));
                     int_smooth_corr_uncert{ii}{jj}{kk}(:, ll) ...
-                            = nanstd(int_smooth_corr_full(:, ind_curr), 0, 2);
+                            = std(int_smooth_corr_full(:, ind_curr), 0, 2, 'omitnan');
                 end
                 
                 % correct for power loss due to reflection slope
@@ -469,7 +468,7 @@ for ii = year_good
                         if ~isnan(temp_iso_curr(ll))
                             tmp = atten_bound(frac_test, conf_uncert, atten_rate_curr(ll), atten_rate_uncert_curr(ll), depth_inc_curr{ll}, H_curr{ll}, Cl_curr{ll}, NH4_curr{ll}, hfcp_struct, temp_iso_curr(ll), res_iso_curr(ll));
                             temp_iso_uncert_curr(ll) ...
-                                = nanmean([(temp_iso_curr(ll) - tmp(1)) (tmp(2) - temp_iso_curr(ll))]);
+                                = mean([(temp_iso_curr(ll) - tmp(1)) (tmp(2) - temp_iso_curr(ll))], 'omitnan');
                         end
                     catch
                         disp([num2str([ii jj kk ll]) ' failed iso...'])
@@ -490,7 +489,7 @@ for ii = year_good
                         if ~isnan(temp_iso_curr(ll))
                             tmp = atten_bound(frac_test, conf_uncert, atten_rate_curr(ll), atten_rate_uncert_curr(ll), depth_inc_curr{ll}, H_curr{ll}, Cl_curr{ll}, NH4_curr{ll}, hfcp_struct, temp_iso_curr(ll), res_iso_curr(ll));
                             temp_iso_uncert_curr(ll) ...
-                                = nanmean([(temp_iso_curr(ll) - tmp(1)) (tmp(2) - temp_iso_curr(ll))]);
+                                = mean([(temp_iso_curr(ll) - tmp(1)) (tmp(2) - temp_iso_curr(ll))], 'omitnan');
                         end
                     catch
                         disp([num2str([ii jj kk ll]) ' failed iso...'])
@@ -502,8 +501,8 @@ for ii = year_good
                                 = deal(NaN);
             
             % redistribute sliced attenuation-rate and best-fit temperature
-            [atten_rate{ii}{jj}{kk}(ind_good), atten_rate_uncert{ii}{jj}{kk}(ind_good), mse_atten{ii}{jj}{kk}(ind_good), res_iso{ii}{jj}{kk}(ind_good), ...
-             temp_iso{ii}{jj}{kk}(ind_good), temp_iso_uncert{ii}{jj}{kk}(ind_good), Cl_trans{ii}{jj}{kk}(ind_good), H_trans{ii}{jj}{kk}(ind_good), NH4_trans{ii}{jj}{kk}(ind_good)] ...
+            [atten_rate{ii}{jj}{kk}(ind_good), atten_rate_uncert{ii}{jj}{kk}(ind_good), mse_atten{ii}{jj}{kk}(ind_good), res_iso{ii}{jj}{kk}(ind_good), temp_iso{ii}{jj}{kk}(ind_good), temp_iso_uncert{ii}{jj}{kk}(ind_good), Cl_trans{ii}{jj}{kk}(ind_good), H_trans{ii}{jj}{kk}(ind_good), ...
+             NH4_trans{ii}{jj}{kk}(ind_good)] ...
                                 = deal((1e3 .* atten_rate_curr), (1e3 .* atten_rate_uncert_curr), mse_atten_curr, res_iso_curr, (temp_iso_curr - 273.15), temp_iso_uncert_curr, Cl_curr, H_curr, NH4_curr);
             
             % record attenuation rate and temperature if interval intersects an ice core

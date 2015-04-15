@@ -6,19 +6,12 @@ function [atten_rate, atten_rate_uncert] ...
 %   calculates the temperature- and impurity-dependent radar attenuation
 %   rate ATTEN_RATE (dB/m) for Greenlandic polar ice, based on the ice
 %   temperature TEMP (K) and concentrations of the the soluble impurities
-%   H+ (H), Cl- (CL) and NH4+ (NH4), whose units are all mol/L. *_UNCERT
-%   are their uncertainties. HFCP is a structure defined by HFCONDPROP that
-%   provides the necessary dielectric properties.
+%   H+ (H), Cl- (CL) and NH4+ (NH4), whose units are all mol/L. HFCP is a
+%   structure defined by HFCONDPROP that provides the necessary dielectric
+%   properties. *_UNCERT are their uncertainties.
 % 
-%   The temperature dependence of this model is based on Stillman et al.,
-%   2013, The role of acids in electrical conduction through ice, J.
-%   Geophys. Res., 118. The impurity-concentration dependence of this model
-%   is the GRIP DEP-chemistry relationship summarized by Wolff et al.,
-%   1997, Factors controlling the electrical conductivity of ice from the
-%   polar regions - a summary, J. Phys. Chem. B, 101, 6090-6094.
-%   
 % Joe MacGregor (UTIG)
-% Last updated: 07/17/14
+% Last updated: 04/02/15
 
 if ~exist('hfcond', 'file')
     error('atten_gris:hfcond', 'Function HFCOND is not available within this user''s path.')

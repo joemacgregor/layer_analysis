@@ -1,7 +1,7 @@
 % BALANCE_LAYERS Map balance velocity history across Greenland.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 11/19/14
+% Last updated: 03/18/15
 
 clear
 
@@ -12,7 +12,7 @@ filt_type                   = 'exp'; % triang or exp
 scale_type                  = 'thick'; % ind or thick
 ind_filt                    = 5; % width of filter, indices, used only when scale_type=ind, should be an odd integer
 std_exp                     = 4; % decay length of filtering exponential, indices, used only when filt_type=exp and scale_type=ind
-thick_filt_ref              = 5; % number of ice thicknesses over which to run filter, used only when scale_type=thick
+thick_filt_ref              = 10; % number of ice thicknesses over which to run filter, used only when scale_type=thick
 plotting                    = false;
 
 if license('checkout', 'map_toolbox')
@@ -36,6 +36,8 @@ load mat/preliminary_acceleration_fields_v2 u_accel_grd w_accel_grd
 
 clear u_accel_grd w_accel_grd
 load mat/surface_acceleration_9ka u_accel_grd_100a u_accel_grd_1000a
+[u_accel_grd_100a(u_accel_grd_100a == 0), u_accel_grd_1000a(u_accel_grd_1000a == 0)] ...
+                            = deal(NaN);
 
 load mat/surface_acceleration_backsteps u_accel_grd_9ka u_accel_grd_surface
 [u_accel_grd_9ka(u_accel_grd_9ka == 0), u_accel_grd_surface(u_accel_grd_surface == 0)] ...
@@ -137,8 +139,8 @@ ind_y                       = find(~mod(y_grd(:, 1), decim), 1):decim:find(~mod(
 [num_decim_y, num_decim_x]  = deal(length(ind_y), length(ind_x));
 
 % % decimate all standard grids
-[accum_RACMO2_decim, elev_surf_gimp_decim, mask_gris_decim, mask_combo_decim, thick_decim, x_decim, y_decim, mask_D1_decim] ...
-                            = deal(accum_RACMO2(ind_y, ind_x), elev_surf_gimp(ind_y, ind_x), mask_gris(ind_y, ind_x), mask_combo(ind_y, ind_x), thick(ind_y, ind_x), x_grd(ind_y, ind_x), y_grd(ind_y, ind_x), mask_D1(ind_y, ind_x));
+[accum_RACMO2_decim, elev_surf_gimp_decim, mask_gris_decim, mask_combo_decim, x_decim, y_decim, mask_D1_decim] ...
+                            = deal(accum_RACMO2(ind_y, ind_x), elev_surf_gimp(ind_y, ind_x), mask_gris(ind_y, ind_x), mask_combo(ind_y, ind_x), x_grd(ind_y, ind_x), y_grd(ind_y, ind_x), mask_D1(ind_y, ind_x));
 
 % decimate speed grid
 % ind_x_speed                 = find(~mod(x_speed(1, :), decim), 1):(2 * decim):find(~mod(x_speed(1, :), decim), 1, 'last');
@@ -186,10 +188,10 @@ switch filt_type
                 end
         end
 end
-%%
+
 disp('Filtering non-model data...')
 
-% filter critical decimated grids
+% filter non-model decimated grids
 vars                        = {'elev_surf_gimp' 'speed_x_decim' 'speed_y_decim' 'thick' 'accel_horiz_model' 'accel_vert_model' 'u_accel_grd_100a' 'u_accel_grd_1000a' 'u_accel_grd_9ka' 'u_accel_grd_surface'};
 vars_filt                   = {'elev_surf_gimp_filt' 'speed_x_filt' 'speed_y_filt' 'thick_filt' 'accel_horiz_model_filt' 'accel_vert_model_filt' 'accel_horiz_model_filt1' 'accel_horiz_model_filt2' 'u_accel_grd_9ka_filt' 'u_accel_grd_surface_filt'};
 num_var                     = length(vars);
@@ -238,7 +240,7 @@ switch scale_type
             end
         end
 end
-%%
+
 % filtered modern surface speed
 speed_filt                  = sqrt((speed_x_filt .^ 2) + (speed_y_filt .^ 2));
 
@@ -304,17 +306,17 @@ disp('Decimating and filtering strain-rate models, then doing flux balance...')
 for ii = num_iso
     disp([num2str(1e-3 * age_iso(ii)) ' ka...'])
     [speed_bal(:, :, ii), speed_bal_surf(:, :, ii), accum_filt(:, :, ii), strain_rate_filt(:, :, ii), thick_shear_filt(:, :, ii), shape_filt(:, :, ii), depth_filt(:, :, ii), vel_vert_filt(:, :, ii)] ...
-                            = bal_vel(age_iso(ii), x_grd, y_grd, squeeze(accum(:, :, ii)), squeeze(depth_iso(:, :, ii)), squeeze(strain_rate(:, :, end)), squeeze(thick_shear(:, :, end)), mask_D1_decim, mask_gris_decim, thick_decim, az_sin_abs_rel, az_cos_abs_rel, az_sin_sign, az_cos_sign, ...
+                            = bal_vel(age_iso(ii), x_grd, y_grd, squeeze(accum(:, :, ii)), squeeze(depth_iso(:, :, ii)), squeeze(strain_rate(:, :, end)), squeeze(thick_shear(:, :, end)), mask_D1_decim, mask_gris_decim, thick_filt, az_sin_abs_rel, az_cos_abs_rel, az_sin_sign, az_cos_sign, ...
                                       ind_sort, length_grd, decim, true, scale_type, filt_decim, filt_decim_ref);
     [speed_bal_ref(:, :, ii), speed_bal_ref_surf(:, :, ii)] ...
-                            = bal_vel(age_iso(ii), x_grd, y_grd, accum_RACMO2, squeeze(depth_iso(:, :, ii)), squeeze(strain_rate(:, :, end)), squeeze(thick_shear(:, :, end)), mask_D1_decim, mask_gris_decim, thick_decim, az_sin_abs_rel, az_cos_abs_rel, az_sin_sign, az_cos_sign, ...
+                            = bal_vel(age_iso(ii), x_grd, y_grd, accum_RACMO2, squeeze(depth_iso(:, :, ii)), squeeze(strain_rate(:, :, end)), squeeze(thick_shear(:, :, end)), mask_D1_decim, mask_gris_decim, thick_filt, az_sin_abs_rel, az_cos_abs_rel, az_sin_sign, az_cos_sign, ...
                                       ind_sort, length_grd, decim, true, scale_type, filt_decim, filt_decim_ref);
-%     [speed_bal_lo(:, :, ii), speed_bal_surf_lo(:, :, ii), accum_lo_filt(:, :, ii), strain_rate_lo_filt(:, :, ii), thick_shear_lo_filt(:, :, ii), shape_lo_filt(:, :, ii), depth_hi_filt(:, :, ii), vel_vert_lo_filt(:, :, ii)] ...
-%                             = bal_vel(age_iso(ii), x_grd, y_grd, squeeze(accum_lo(:, :, ii)), (squeeze(depth_iso(:, :, ii)) + squeeze(depth_iso_uncert(:, :, ii))), squeeze(strain_rate_lo(:, :, end)), squeeze(thick_shear_lo(:, :, end)), mask_D1_decim, mask_gris_decim, thick_decim, ...
-%                                       az_sin_abs_rel, az_cos_abs_rel, az_sin_sign, az_cos_sign, ind_sort, length_grd, decim, true, scale_type, filt_decim, filt_decim_ref);
-%     [speed_bal_hi(:, :, ii), speed_bal_surf_hi(:, :, ii), accum_hi_filt(:, :, ii), strain_rate_hi_filt(:, :, ii), thick_shear_hi_filt(:, :, ii), shape_hi_filt(:, :, ii), depth_lo_filt(:, :, ii), vel_vert_hi_filt(:, :, ii)] ...
-%                             = bal_vel(age_iso(ii), x_grd, y_grd, squeeze(accum_hi(:, :, ii)), (squeeze(depth_iso(:, :, ii)) - squeeze(depth_iso_uncert(:, :, ii))), squeeze(strain_rate_hi(:, :, end)), squeeze(thick_shear_hi(:, :, end)), mask_D1_decim, mask_gris_decim, thick_decim, ...
-%                                       az_sin_abs_rel, az_cos_abs_rel, az_sin_sign, az_cos_sign, ind_sort, length_grd, decim, true, scale_type, filt_decim, filt_decim_ref);
+    [speed_bal_lo(:, :, ii), speed_bal_surf_lo(:, :, ii), accum_lo_filt(:, :, ii), strain_rate_lo_filt(:, :, ii), thick_shear_lo_filt(:, :, ii), shape_lo_filt(:, :, ii), depth_hi_filt(:, :, ii), vel_vert_lo_filt(:, :, ii)] ...
+                            = bal_vel(age_iso(ii), x_grd, y_grd, squeeze(accum_lo(:, :, ii)), (squeeze(depth_iso(:, :, ii)) + squeeze(depth_iso_uncert(:, :, ii))), squeeze(strain_rate_lo(:, :, end)), squeeze(thick_shear_lo(:, :, end)), mask_D1_decim, mask_gris_decim, thick_filt, ...
+                                      az_sin_abs_rel, az_cos_abs_rel, az_sin_sign, az_cos_sign, ind_sort, length_grd, decim, true, scale_type, filt_decim, filt_decim_ref);
+    [speed_bal_hi(:, :, ii), speed_bal_surf_hi(:, :, ii), accum_hi_filt(:, :, ii), strain_rate_hi_filt(:, :, ii), thick_shear_hi_filt(:, :, ii), shape_hi_filt(:, :, ii), depth_lo_filt(:, :, ii), vel_vert_hi_filt(:, :, ii)] ...
+                            = bal_vel(age_iso(ii), x_grd, y_grd, squeeze(accum_hi(:, :, ii)), (squeeze(depth_iso(:, :, ii)) - squeeze(depth_iso_uncert(:, :, ii))), squeeze(strain_rate_hi(:, :, end)), squeeze(thick_shear_hi(:, :, end)), mask_D1_decim, mask_gris_decim, thick_filt, ...
+                                      az_sin_abs_rel, az_cos_abs_rel, az_sin_sign, az_cos_sign, ind_sort, length_grd, decim, true, scale_type, filt_decim, filt_decim_ref);
 end
 
 % [speed_bal_full, speed_bal_full_surf] ...
@@ -338,10 +340,10 @@ speed_change_ref_rel        = 100 .* (speed_change_ref ./ speed_filt(:, :, ones(
 
 % speed_change_full           = speed_bal_full_surf - speed_filt;
 % speed_change_rel_full       = 100 .* (speed_change_full ./ speed_filt);
-% speed_change_lo             = speed_bal_surf_lo - speed_filt(:, :, ones(1, 1, num_iso));
-% speed_change_rel_lo         = 100 .* (speed_change_lo ./ speed_filt(:, :, ones(1, 1, num_iso)));
-% speed_change_hi             = speed_bal_surf_hi - speed_filt(:, :, ones(1, 1, num_iso));
-% speed_change_rel_hi         = 100 .* (speed_change_hi ./ speed_filt(:, :, ones(1, 1, num_iso)));
+speed_change_lo             = speed_bal_surf_lo - speed_filt(:, :, ones(1, 1, num_iso));
+speed_change_rel_lo         = 100 .* (speed_change_lo ./ speed_filt(:, :, ones(1, 1, num_iso)));
+speed_change_hi             = speed_bal_surf_hi - speed_filt(:, :, ones(1, 1, num_iso));
+speed_change_rel_hi         = 100 .* (speed_change_hi ./ speed_filt(:, :, ones(1, 1, num_iso)));
 
 % speed_hist_change           = speed_bal_surf_hist - speed_filt(:, :, ones(1, 1, (num_iso - 1)));
 % speed_hist_change_rel       = 100 .* (speed_hist_change ./ speed_filt(:, :, ones(1, 1, (num_iso - 1))));
@@ -360,13 +362,13 @@ if plotting
     
 %% FIGURE 1: ISOCHRONE DEPTH, ACCUMULATION RATE, STRAIN RATE AND VERTICAL VELOCITY
 
-    figure('position', [200 200 1600 600], 'name', [num2str(1e-3 * age_max) ' ka'])
+    figure('position', [200 200 1600 600], 'name', [num2str(1e-3 * age_max) ' ka'], 'color', 'w', 'renderer', 'zbuffer')
     colormap([([135 206 235] ./ 255); ([159 89 39] ./ 255); 0.9 0.9 0.9; jet(20)])
-    ranges                  = [200 2200; 0 50; 0 30; 0 15];
+    ranges                  = [200 2200; 0 50; -30 0; 0 15];
     incs                    = [100 2.5 1.5 0.75];
-    plots                   = {'squeeze(depth_filt(:, :, end))' '1e2 .* squeeze(accum_filt(:, :, end))' '1e5 .* squeeze(strain_rate_filt(:, :, end))' '1e2 .* squeeze(vel_vert_filt(:, :, end))'};
+    plots                   = {'squeeze(depth_filt(:, :, end))' '1e2 .* squeeze(accum_filt(:, :, end))' '-1e5 .* squeeze(strain_rate_filt(:, :, end))' '1e2 .* squeeze(vel_vert_filt(:, :, end))'};
     titles                  = {['$z_{' num2str(1e-3 * age_max) '\,\mathrm{ka}}$'] ['$\dot{b}_{' num2str(1e-3 * age_max) '\,\mathrm{ka}}$'] ['$\dot{\epsilon}_{' num2str(1e-3 * age_max) '\,\mathrm{ka}}$'] ['$w_{' num2str(1e-3 * age_max) '\,\mathrm{ka}}$']};
-    spaces                  = [8 8 8 9];
+    spaces                  = [8 8 9 9];
     units                   = {'m' 'cm a^{-1}' '10^{-5} a^{-1}' 'cm a^{-1}'};
     letters                 = 'A':'D';
     [ax, cb1, cb2]          = deal(zeros(1, 4));
@@ -380,7 +382,7 @@ if plotting
         plot_tmp(isnan(plot_tmp)) ...
                             = mask_combo_decim(isnan(plot_tmp)) + 1;
         imagesc(x_decim(1, :), y_decim(:, 1), plot_tmp)
-        [pp, pm, pb]        = deal(zeros(1, length(x_paral)), zeros(1, length(x_merid)), zeros(1, length(num_basin)));
+        [pp, pm, pb]        = deal(NaN(1, length(x_paral)), NaN(1, length(x_merid)), NaN(1, length(num_basin)));
         for jj = 1:length(x_paral)
             pp(jj)          = plot((1e-3 .* x_paral{jj}), (1e-3 .* y_paral{jj}), 'k--', 'linewidth', 1);
         end
@@ -426,29 +428,30 @@ if plotting
         for jj = 1:2:21
             tick_str{jj}    = num2str(ranges(ii, 1) + (incs(ii) * (jj - 1)));
         end
-        if (ii == 1)
+        if any(ii == [1 3])
             tick_str{1}     = ['<' tick_str{1}];
         end
-        tick_str{end}       = ['>' tick_str{end}];
-        cb1(ii)             = colorbar('fontsize', 20, 'location', 'eastoutside', 'limits', [4 24], 'ytick', 4:24, 'yticklabel', tick_str);
-%         set(cb1(ii), 'visible', 'off')
-%         cb2(ii)             = cbarf([4 24], 4:24, 'vertical', 'linear');
-%         set(cb2(ii), 'fontsize', 20, 'ytick', 4:24, 'yticklabel', tick_str, 'position', get(cb1(ii), 'position'));
+        if (ii ~= 3)
+            tick_str{end}   = ['>' tick_str{end}];
+        end
+        cb1(ii)             = colorbar('fontsize', 20, 'location', 'eastoutside', 'limits', [4 24], 'ytick', 4:24, 'yticklabel', tick_str, 'ticklength', 0.0375);
     end
     linkaxes(ax)
     
 %% FIGURE 2: BALANCE-VELOCITY COMPARISON
 
-    figure('position', [200 200 1600 600], 'name', [num2str(1e-3 * age_max) ' ka'])
-    colormap([([135 206 235] ./ 255); ([159 89 39] ./ 255); 0.9 0.9 0.9; jet(20)])
+    c1                      = [([135 206 235] ./ 255); ([159 89 39] ./ 255); 0.9 0.9 0.9; jet(20)];
+    c2                      = [([135 206 235] ./ 255); ([159 89 39] ./ 255); 0.9 0.9 0.9; redblue(20)];
+    figure('position', [200 200 1600 600], 'name', [num2str(1e-3 * age_max) ' ka'], 'color', 'w', 'renderer', 'zbuffer')
+    colormap(c1)
     ranges                  = [0 2; 0 2; -20 20; -100 100];
     incs                    = [0.1  0.1  2 10];
-    plots                   = {'log10(speed_bal_ref_surf(:, :, end))' 'log10(speed_filt)' 'speed_change_ref(:, :, end)' 'speed_change_ref_rel(:, :, end)'};
+    plots                   = {'log10(speed_bal_surf(:, :, end))' 'log10(speed_filt)' '-speed_change(:, :, end)' '-speed_change_rel(:, :, end)'};
     titles                  = {['$u_s^{' num2str(1e-3 * age_max) '\,\mathrm{ka}}$'] '$u_s^{2007-2010}$' '$\Delta u_s$' '${\Delta}u_s/u_s^{2007-2010}$'};
     units                   = {'m a^{-1}' 'm a^{-1}' 'm a^{-1}' '%'};
     unitsx                  = [0 20 20 50];
     letters                 = 'A':'D';
-    spaces                  = [8 17 8 25];
+    spaces                  = [8 16 9 24];
     [ax, cb, cb2]           = deal(zeros(1, 4));
     for ii = 1:4
         ax(ii)              = subplot('position', [(-0.005 + (0.245 * (ii - 1))) 0.02 0.245 0.9]);
@@ -484,73 +487,308 @@ if plotting
         text(-334, -3250, '50\circW', 'color', 'k', 'fontsize', 18, 'rotation', 82)
         text(483, -2771, '65\circN', 'color', 'k', 'fontsize', 18, 'rotation', 15)
         text(717, -2897, '30\circW', 'color', 'k', 'fontsize', 18, 'rotation', -75)
-        caxis([1 23])
+        caxis([1 24])
         axis equal
         axis([x_min x_max y_min y_max])
         box on
         set(gca, 'fontsize', 20, 'layer', 'top', 'xtick', [], 'ytick', [], 'xticklabel', {}, 'yticklabel', {})
-%         if (ii > 1)
-            text((825 + unitsx(ii)), -525, ['(' units{ii} ')'], 'color', 'k', 'fontsize', 20)
-%         end
+        text((825 + unitsx(ii)), -525, ['(' units{ii} ')'], 'color', 'k', 'fontsize', 20)
         text(-550, -800, repmat(' ', 1, (spaces(ii) + 1)), 'color', 'k', 'fontsize', 22, 'fontweight', 'bold', 'edgecolor', 'k', 'backgroundcolor', 'w')
         text(-550, -800, [letters(ii) repmat(' ', 1, spaces(ii))], 'color', 'k', 'fontsize', 20, 'fontweight', 'bold')
         text(-450, -810, titles{ii}, 'color', 'k', 'fontsize', 20, 'fontweight', 'bold', 'interpreter', 'latex')
         tick_str        = cell(1, 21);
+        for jj = 1:21
+            tick_str{jj}= '';
+        end
         if (ii > 2)
             for jj = 1:2:21
-                tick_str{jj}= num2str(ranges(ii, 1) + (incs(ii) * (jj - 1)));
-            end
-            for jj = 2:2:21
-                tick_str{jj}= '';
+                tick_str{jj} ...
+                        = num2str(ranges(ii, 1) + (incs(ii) * (jj - 1)));
             end
         else
-            for jj = 1:21
-                tick_str{jj}= '';
-            end
             tick_str{1} = num2str(10 ^ (ranges(ii, 1)));
             tick_str{11}= '10';
             tick_str{end} ...
-                = num2str(10 ^ (ranges(ii, 2)));
+                        = num2str(10 ^ (ranges(ii, 2)));
         end
         tick_str{1}     = ['<' tick_str{1}];
-        if (ii >= 2)
-            tick_str{end} ...
-                = ['>' tick_str{end}];
-        end
-        cb(ii)          = colorbar('fontsize', 20, 'location', 'eastoutside', 'ylim', [4 24], 'ytick', 4:24, 'yticklabel', tick_str);
-        set(cb(ii), 'visible', 'off')
-        cb2(ii)         = cbarf([4 24], 4:24, 'vertical', 'linear');
-        set(cb2(ii), 'fontsize', 20, 'ytick', 4:24, 'yticklabel', tick_str, 'position', get(cb(ii), 'position'));
-%         if (ii == 1)
-%             set(cb2(ii), 'visible', 'off')
-%         end
-        if (any(ii == [1 2]))
-            freezeColors
-            if (ii == 2)
-                colormap([([135 206 235] ./ 255); ([159 89 39] ./ 255); 0.9 0.9 0.9; redblue(20)])
-                set(cb2(ii), 'position', get(cb(ii), 'position'), 'ylim', [4 24], 'ytick', 4:24)
-            end
-        end
+        tick_str{end}   = ['>' tick_str{end}];
+        cb(ii)          = colorbar('fontsize', 20, 'location', 'eastoutside', 'ylim', [4 24], 'ytick', 4:24, 'yticklabel', tick_str, 'ticklength', 0.0375);
     end
+    colormap(ax(3), c2)
+    colormap(ax(4), c2)
     linkaxes(ax)
     
 %% FIGURE 3: MODELED/OBSERVED HORIZONTAL DECELERATION
 
-    figure('position', [200 200 800 600], 'name', [num2str(1e-3 * age_max) ' ka'])
-    colormap([([135 206 235] ./ 255); ([159 89 39] ./ 255); 0.9 0.9 0.9; jet(20)])
-    ranges                  = [-3 2];
-    incs                    = 0.25;
-    plots                   = {'log10(u_accel_grd_surface_filt)'};
-    titles                  = {'$-{\partial}u/{\partial}t$'};
-    spaces                  = 14;
-    units                   = {'mm a^{-2}'};
-    letters                 = 'A';
-    [ax, cb1, cb2]          = deal(0);
-    for ii = 1
-        ax(ii)              = subplot('position', [(-0.01 + (0.5 * (ii - 1))) 0.02 0.5 0.9]);
+    ind_good_pos            = find(~isnan(speed_change_ref) & ~isnan(accel_horiz_model_filt2) & (speed_change_ref > 0) & (accel_horiz_model_filt2 < 0));
+    tmp                     = (1e2 / length(ind_good_pos)) .* hist3([log10((1e3 / age_max) .* speed_change_ref(ind_good_pos)) log10(-accel_horiz_model_filt2(ind_good_pos))], 'Edges', {-3:0.1:2  -3:0.1:2});
+    tmp(tmp == 0)           = NaN;
+    c1                      = [([135 206 235] ./ 255); ([159 89 39] ./ 255); 0.9 0.9 0.9; jet(20)];
+    c2                      = [([135 206 235] ./ 255); ([159 89 39] ./ 255); 0.9 0.9 0.9; redblue(20)];
+    figure('position', [200 200 1200 600], 'name', [num2str(1e-3 * age_max) ' ka'], 'color', 'w', 'renderer', 'zbuffer')
+    colormap(c1)
+    ranges                  = [-3 2; -2 2];
+    incs                    = [0.25 0.20];
+    plots                   = {'log10(-accel_horiz_model_filt2)' 'log10(-accel_horiz_model_filt2 ./ ((1e3 / age_max) .* speed_change_ref))'};
+    titles                  = {'$-{\partial}u/{\partial}t$' '$-({\partial}u/{\partial}t)\,/\,(\Delta u_s'' / 9\,\mathrm{ka})$'};
+    spaces                  = [14 34];
+    units                   = {'mm a^{-2}' ''};
+    letters                 = 'A':'B';
+    [ax, cb1, cb2]          = deal(zeros(1, 2));
+    for ii = 1:2
+        ax(ii)              = subplot('position', [(-0.005 + (0.335 * (ii - 1))) 0.02 0.325 0.9]);
         hold on
         range_tmp           = ranges(ii, 1):incs(ii):ranges(ii, 2);
         plot_tmp            = eval(plots{ii});
+        if (ii == 2)
+            plot_tmp(setdiff(1:numel(accel_horiz_model_filt2), ind_good_pos)) ...
+                            = NaN;
+        end
+        plot_tmp            = 3 + interp1((range_tmp(1:(end - 1)) + (diff(range_tmp) ./ 2)), 1:20, plot_tmp, 'nearest', 'extrap');
+        plot_tmp(isnan(plot_tmp)) ...
+                            = mask_combo_decim(isnan(plot_tmp)) + 1;
+        imagesc(x_decim(1, :), y_decim(:, 1), plot_tmp)
+        [pp, pm, pb]        = deal(zeros(1, length(x_paral)), zeros(1, length(x_merid)), zeros(1, length(num_basin)));
+        for jj = 1:length(x_paral)
+            pp(jj)          = plot((1e-3 .* x_paral{jj}), (1e-3 .* y_paral{jj}), 'k--', 'linewidth', 1);
+        end
+        for jj = 1:length(x_merid)
+            pm(jj)          = plot((1e-3 .* x_merid{jj}), (1e-3 .* y_merid{jj}), 'k--', 'linewidth', 1);
+        end
+        for jj = 1:num_coast
+            plot(x_coast{jj}, y_coast{jj}, 'color', [0.5 0.5 0.5], 'linewidth', 1)
+        end
+        for jj = 1:num_basin
+            pb(jj)          = plot(x_basin{jj}, y_basin{jj}, 'color', 'k', 'linewidth', 2);
+        end
+        plot(x_D1_ord, y_D1_ord, 'm', 'linewidth', 2)
+        caxis([1 24])
+        axis equal
+        axis([x_min x_max y_min y_max])
+        box on
+        set(gca, 'fontsize', 20, 'layer', 'top', 'xtick', [], 'ytick', [])
+        if ~isempty(units{ii})
+            text(825, -525, ['(' units{ii} ')'], 'color', 'k', 'fontsize', 20)
+        end
+        fill([325 450 450 325], [-3230 -3230 -3260 -3260], 'k')
+        fill([450 575 575 450], [-3230 -3230 -3260 -3260], 'w', 'edgecolor', 'k')
+        text(300, -3180, '0', 'color', 'k', 'fontsize', 18)
+        text(520, -3180, '250 km', 'color', 'k', 'fontsize', 18)
+        text(-550, -800, repmat(' ', 1, (spaces(ii) + 1)), 'color', 'k', 'fontsize', 22, 'fontweight', 'bold', 'edgecolor', 'k', 'backgroundcolor', 'w')
+        text(-550, -800, [letters(ii) repmat(' ', 1, spaces(ii))], 'color', 'k', 'fontsize', 20, 'fontweight', 'bold')
+        text(-450, -810, titles{ii}, 'color', 'k', 'fontsize', 20, 'interpreter', 'latex')
+        text(-607, -3215, '60\circN', 'color', 'k', 'fontsize', 18, 'rotation', -10)
+        text(-334, -3250, '50\circW', 'color', 'k', 'fontsize', 18, 'rotation', 82)
+        text(483, -2771, '65\circN', 'color', 'k', 'fontsize', 18, 'rotation', 14)
+        text(717, -2897, '30\circW', 'color', 'k', 'fontsize', 18, 'rotation', -75)
+        tick_str            = cell(1, 21);
+        for jj = 1:21
+            tick_str{jj}    = '';
+        end
+        if (ii == 1)
+            for jj = 1:4:21
+                tick_str{jj}= num2str(10 ^ range_tmp(jj));
+            end
+            tick_str{1}     = '0.001';
+        else
+            for jj = 1:5:21
+                tick_str{jj}= num2str(10 ^ range_tmp(jj));
+            end            
+        end
+        tick_str{1}         = ['<' tick_str{1}];
+        tick_str{end}       = ['>' tick_str{end}];
+        cb1(ii)             = colorbar('fontsize', 20, 'location', 'eastoutside', 'limits', [4 24], 'ytick', 4:24, 'yticklabel', tick_str, 'ticklength', 0.0375);
+    end
+    subplot('position', [0.69 0.25 0.3 0.6])
+    hold on
+    pcolor(-3:0.1:2, -3:0.1:2, interp1(0:0.025:0.5, 4:24, tmp', 'nearest', 'extrap'));
+    shading flat
+    axis([-3 2 -3 2])
+    axis equal
+    plot(get(gca, 'xlim'), get(gca, 'ylim'), '--', 'color', [0.5 0.5 0.5], 'linewidth', 2)
+%     plot(-3:0.1:2, polyval(polyfit(log10((1e3 / age_max) .* speed_change(ind_good_pos)), log10(-accel_horiz_model_filt2(ind_good_pos)), 1), -3:0.1:2), 'm--', 'linewidth', 2)
+    set(gca, 'fontsize', 20, 'xtick', -3:2, 'xticklabel', {'10^{-3}' '10^{-2}' '10^{-1}' '10^0' '10^1' '10^2'}, 'ytick', -3:2, 'yticklabel', {'10^{-3}' '10^{-2}' '10^{-1}' '10^0' '10^1' '10^2'})
+    xlabel('{\Delta}u_s''/ 9 ka (mm a^{-2})')
+    ylabel('Modeled -{\partial}u/{\partial}t (mm a^{-2})')
+    caxis([1 24])
+    range_tmp               = 0:0.025:5;
+    for jj = 1:21
+        tick_str{jj}        = '';
+    end
+    for jj = 1:4:21
+        tick_str{jj}        = num2str(range_tmp(jj));
+    end
+    tick_str{end}           = ['>' tick_str{end}];
+    colorbar('location', 'northoutside', 'fontsize', 20, 'limits', [4 24], 'xtick', 4:24, 'xticklabel', tick_str, 'ticklength', 0.07);
+    text(-2.7, 1.6, 'C', 'color', 'k', 'fontsize', 20, 'fontweight', 'bold')
+    text(-2.5, 3.7, 'Fraction of grid points (%)', 'color', 'k', 'fontsize', 20)
+    box on
+    colormap(ax(2), c2)
+            
+%% SHEAR-LAYER THICKNESS AND SHAPE FACTOR (FIG. S3)
+
+    figure('position', [200 200 880 640], 'color', 'w', 'renderer', 'zbuffer')
+    colormap([([135 206 235] ./ 255); ([159 89 39] ./ 255); 0.9 0.9 0.9; jet(20)])
+    ranges                  = [0 2000; 0.9 1];
+    incs                    = [100     0.005];
+    plots                   = {'squeeze(thick_shear_filt(:, :, end))' 'squeeze(shape_filt(:, :, end))'};
+    titles                  = {'$h$' '$\phi(z_{9\,\mathrm{ka}})$'};
+    spaces                  = [5 13];
+    units                   = {'m' ''};
+    letters                 = 'A':'B';
+    [ax, cb1, cb2]          = deal(zeros(1, 2));
+    for ii = 1:2
+        ax(ii)              = subplot('position', [(0.005 + (0.49 * (ii - 1))) 0.03 0.48 0.90]);
+        hold on
+        range_tmp           = ranges(ii, 1):incs(ii):ranges(ii, 2);
+        plot_tmp            = eval(plots{ii});
+        plot_tmp(~mask_D1_decim) ...
+                            = NaN;
+        plot_tmp            = 3 + interp1((range_tmp(1:(end - 1)) + (diff(range_tmp) ./ 2)), 1:20, plot_tmp, 'nearest', 'extrap');
+        plot_tmp(isnan(plot_tmp)) ...
+                            = mask_combo_decim(isnan(plot_tmp)) + 1;
+        imagesc(x_decim(1, :), y_decim(:, 1), plot_tmp)
+        [pp, pm, pb]        = deal(zeros(1, length(x_paral)), zeros(1, length(x_merid)), zeros(1, length(num_basin)));
+        for jj = 1:length(x_paral)
+            pp(jj)          = plot((1e-3 .* x_paral{jj}), (1e-3 .* y_paral{jj}), 'k--', 'linewidth', 1);
+        end
+        for jj = 1:length(x_merid)
+            pm(jj)          = plot((1e-3 .* x_merid{jj}), (1e-3 .* y_merid{jj}), 'k--', 'linewidth', 1);
+        end
+        for jj = 1:num_coast
+            plot(x_coast{jj}, y_coast{jj}, 'color', [0.5 0.5 0.5], 'linewidth', 1)
+        end
+        for jj = 1:num_basin
+            pb(jj)          = plot(x_basin{jj}, y_basin{jj}, 'color', 'k', 'linewidth', 2);
+        end
+        plot(x_D1_ord, y_D1_ord, 'm', 'linewidth', 1)
+        caxis([1 24])
+        axis equal
+        axis([x_min x_max y_min y_max])
+        box on
+        set(gca, 'fontsize', 20, 'layer', 'top', 'xtick', [], 'ytick', [])
+        if ~isempty(units{ii})
+            text(875, -550, ['(' units{ii} ')'], 'color', 'k', 'fontsize', 20)
+        end
+        fill([325 450 450 325], [-3230 -3230 -3260 -3260], 'k')
+        fill([450 575 575 450], [-3230 -3230 -3260 -3260], 'w', 'edgecolor', 'k')
+        text(300, -3180, '0', 'color', 'k', 'fontsize', 18)
+        text(520, -3180, '250 km', 'color', 'k', 'fontsize', 18)
+        text(-550, -800, repmat(' ', 1, (spaces(ii) + 1)), 'color', 'k', 'fontsize', 22, 'fontweight', 'bold', 'edgecolor', 'k', 'backgroundcolor', 'w')        
+        text(-550, -800, [letters(ii) repmat(' ', 1, spaces(ii))], 'color', 'k', 'fontsize', 20, 'fontweight', 'bold')
+        text(-450, -810, titles{ii}, 'color', 'k', 'fontsize', 20, 'fontweight', 'bold', 'interpreter', 'latex')
+        text(-607, -3215, '60\circN', 'color', 'k', 'fontsize', 18, 'rotation', -10)
+        text(-334, -3250, '50\circW', 'color', 'k', 'fontsize', 18, 'rotation', 82)
+        text(483, -2771, '65\circN', 'color', 'k', 'fontsize', 18, 'rotation', 15)
+        text(717, -2897, '30\circW', 'color', 'k', 'fontsize', 18, 'rotation', -75)
+        tick_str            = cell(1, 21);
+        for jj = 2:2:21
+            tick_str{jj}= '';
+        end
+        for jj = 1:2:21
+            tick_str{jj}= num2str(ranges(ii, 1) + (incs(ii) * (jj - 1)));
+        end
+        tick_str{1}         = ['<' tick_str{1}];
+        tick_str{end}       = ['>' tick_str{end}];
+        cb1(ii)             = colorbar('fontsize', 20, 'location', 'eastoutside', 'limits', [4 24], 'ytick', 4:24, 'yticklabel', tick_str, 'ticklength', 0.035);
+    end
+    linkaxes(ax)
+   
+%% ACCUMULATION-RATE COMPARISON (FIG. S4)
+
+    c1                      = [([135 206 235] ./ 255); ([159 89 39] ./ 255); 0.9 0.9 0.9; jet(20)];
+    c2                      = [([135 206 235] ./ 255); ([159 89 39] ./ 255); 0.9 0.9 0.9; redblue(20)];
+    figure('position', [200 200 1600 600], 'color', 'w', 'renderer', 'zbuffer')
+    colormap(c1)
+    ranges                  = [0 60; 0 60; -10 10; -50 50];
+    incs                    = [3 3 1 5];
+    plots                   = {'1e2 .* squeeze(accum_filt(:, :, end))' '1e2 .* accum_RACMO2_decim' '1e2 .* accum_diff' '1e2 .* accum_diff_rel'};
+    titles                  = {'$\dot{b}_{9\,\mathrm{ka}}$' '$\dot{b}_{1958-2007}$' '$\Delta \dot{b}$' '$\Delta \dot{b}/\dot{b}_{1958-2007}$'};
+    units                   = {'(cm a^{-1})' '(cm a^{-1})' '(cm a^{-1})' '(%)'};
+    spaces                  = [8 16 7 22];
+    unitsx                  = [0 0 25 60];
+    letters                 = 'A':'D';
+    [ax, cb, cb2]           = deal(zeros(1, 4));
+    for ii = 1:4
+        ax(ii)              = subplot('position', [(-0.005 + (0.25 * (ii - 1))) 0.02 0.245 0.9]);
+        hold on
+        plot_tmp            = eval(plots{ii});
+        if (ii ~= 2)
+            plot_tmp(~mask_D1_decim) ...
+                            = NaN;
+        end
+        range_tmp           = ranges(ii, 1):incs(ii):ranges(ii, 2);
+        plot_tmp            = 3 + interp1((range_tmp(1:(end - 1)) + (diff(range_tmp) ./ 2)), 1:20, plot_tmp, 'nearest', 'extrap');
+        plot_tmp(isnan(plot_tmp)) ...
+                            = mask_combo_decim(isnan(plot_tmp)) + 1;
+        imagesc(x_grd(1, :), y_grd(:, 1), plot_tmp)
+        for jj = 1:num_coast
+            plot(x_coast{jj}, y_coast{jj}, 'color', [0.5 0.5 0.5], 'linewidth', 1)
+        end
+        for jj = 1:length(x_paral)
+            plot((1e-3 .* x_paral{jj}), (1e-3 .* y_paral{jj}), '--', 'linewidth', 0.5, 'color', [0.5 0.5 0.5])
+        end
+        for jj = 1:length(x_merid)
+            plot((1e-3 .* x_merid{jj}), (1e-3 .* y_merid{jj}), '--', 'linewidth', 0.5, 'color', [0.5 0.5 0.5])
+        end
+        for jj = 1:num_basin
+            plot(x_basin{jj}, y_basin{jj}, 'color', 'k', 'linewidth', 2)
+        end
+        plot(x_D1_ord, y_D1_ord, 'm', 'linewidth', 2)
+        fill([325 450 450 325], [-3230 -3230 -3260 -3260], 'k')
+        fill([450 575 575 450], [-3230 -3230 -3260 -3260], 'w', 'edgecolor', 'k')   
+        text(300, -3180, '0', 'color', 'k', 'fontsize', 18)
+        text(520, -3180, '250 km', 'color', 'k', 'fontsize', 18)
+        caxis([1 24])
+        axis equal
+        axis([x_min x_max y_min y_max])
+        box on
+        set(gca, 'fontsize', 20, 'layer', 'top', 'xtick', [], 'ytick', [], 'xticklabel', {}, 'yticklabel', {})
+        text((825 + unitsx(ii)), -525, units{ii}, 'color', 'k', 'fontsize', 20)
+        text(-607, -3215, '60\circN', 'color', 'k', 'fontsize', 18, 'rotation', -10)
+        text(-334, -3250, '50\circW', 'color', 'k', 'fontsize', 18, 'rotation', 82)
+        text(483, -2771, '65\circN', 'color', 'k', 'fontsize', 18, 'rotation', 14)
+        text(717, -2897, '30\circW', 'color', 'k', 'fontsize', 18, 'rotation', -75)
+        text(-550, -800, repmat(' ', 1, (spaces(ii) + 1)), 'color', 'k', 'fontsize', 22, 'fontweight', 'bold', 'edgecolor', 'k', 'backgroundcolor', 'w')
+        text(-550, -800, [letters(ii) repmat(' ', 1, spaces(ii))], 'color', 'k', 'fontsize', 20, 'fontweight', 'bold')
+        text(-450, -810, titles{ii}, 'color', 'k', 'fontsize', 20, 'fontweight', 'bold', 'interpreter', 'latex')
+        tick_str            = cell(1, 21);
+        for jj = 1:2:21
+            tick_str{jj}    = num2str(ranges(ii, 1) + (incs(ii) * (jj - 1)));
+        end
+        for jj = 2:2:21
+            tick_str{jj}    = '';
+        end
+        if (ii > 2)
+            tick_str{1}     = ['<' tick_str{1}];
+        end
+        tick_str{end}       = ['>' tick_str{end}];
+        cb(ii)              = colorbar('fontsize', 20, 'location', 'eastoutside', 'ylim', [4 24], 'ytick', 4:24, 'yticklabel', tick_str, 'ticklength', 0.0375);
+    end
+    colormap(ax(3), c2)
+    colormap(ax(4), c2)
+    linkaxes(ax)    
+    
+%% FIGURE S5: BALANCE VELOCITY HI/LO COMPARISON
+
+    figure('position', [200 200 1200 600], 'name', [num2str(1e-3 * age_max) ' ka'], 'color', 'w', 'renderer', 'zbuffer')
+    colormap([([135 206 235] ./ 255); ([159 89 39] ./ 255); 0.9 0.9 0.9; redblue(20)])
+    ranges                  = [-20 20; -20 20; -20 20];
+    incs                    = [2 2 2];
+    plots                   = {'-speed_change_ref(:, :, end)' '-speed_change_lo(:, :, end)' '-speed_change_hi(:, :, end)'};
+    titles                  = {'$\Delta u_s''$' '$\Delta u_s^{\min}$' '$\Delta u_s^{\max}$'};
+    spaces                  = [8 12 12];
+    units                   = {'m a^{-1}' 'm a^{-1}' 'm a^{-1}'};
+    letters                 = 'A':'C';
+    [ax, cb1, cb2]          = deal(zeros(1, 3));
+    for ii = 1:3
+        ax(ii)              = subplot('position', [(-0.005 + (0.335 * (ii - 1))) 0.02 0.325 0.9]);
+        hold on
+        range_tmp           = ranges(ii, 1):incs(ii):ranges(ii, 2);
+        plot_tmp            = eval(plots{ii});
+        plot_tmp(~mask_D1_decim) ...
+                            = NaN;
         plot_tmp            = 3 + interp1((range_tmp(1:(end - 1)) + (diff(range_tmp) ./ 2)), 1:20, plot_tmp, 'nearest', 'extrap');
         plot_tmp(isnan(plot_tmp)) ...
                             = mask_combo_decim(isnan(plot_tmp)) + 1;
@@ -590,41 +828,14 @@ if plotting
         for jj = 1:21
             tick_str{jj}    = '';
         end
-        for jj = 1:4:21
-            tick_str{jj}    = num2str(10 ^ range_tmp(jj));
+        for jj = 1:2:21
+            tick_str{jj}    = num2str(range_tmp(jj));
         end
-        tick_str{1}         = '0.00001';
         tick_str{1}         = ['<' tick_str{1}];
         tick_str{end}       = ['>' tick_str{end}];
-        cb1(ii)             = colorbar('fontsize', 20, 'location', 'eastoutside', 'limits', [4 24], 'ytick', 4:24, 'yticklabel', tick_str);
+        cb1(ii)             = colorbar('fontsize', 20, 'location', 'eastoutside', 'limits', [4 24], 'ytick', 4:24, 'yticklabel', tick_str, 'ticklength', 0.0375);
     end
-    subplot('position', [0.5 0.25 0.55 0.55])
-    ind_good_pos            = find(~isnan(speed_change) & ~isnan(u_accel_grd_surface_filt) & (speed_change> 0) & (u_accel_grd_surface_filt > 0));
-    hold on
-    tmp                     = (1e2 / length(ind_good_pos)) .* hist3([log10((1e3 / age_max) .* speed_change(ind_good_pos)) log10(u_accel_grd_surface_filt(ind_good_pos))], {-3:0.1:2  -3:0.1:2});
-    tmp(tmp == 0)           = NaN;
-    pcolor(-3:0.1:2, -3:0.1:2, interp1(0:0.025:0.5, 4:24, tmp, 'nearest', 'extrap'));
-    shading flat
-    axis equal
-    axis([-3 2 -3 2])
-    plot(get(gca, 'xlim'), get(gca, 'ylim'), '--', 'color', [0.5 0.5 0.5], 'linewidth', 2)
-%     plot(-3:0.1:2, polyval(polyfit(log10((1e3 / age_max) .* speed_change(ind_good_pos)), log10(-accel_horiz_model_filt(ind_good_pos)), 1), -3:0.1:2), 'm--', 'linewidth', 2)
-    set(gca, 'fontsize', 20, 'xtick', -3:2, 'xticklabel', {'10^{-3}' '10^{-2}' '10^{-1}' '10^0' '10^1' '10^2'}, 'ytick', -3:2, 'yticklabel', {'10^{-3}' '10^{-2}' '10^{-1}' '10^0' '10^1' '10^2'})
-    xlabel('{\Delta}u_s/ 9 ka (mm a^{-2})')
-    ylabel('Modeled -{\partial}u/{\partial}t (mm a^{-2})')
-    caxis([1 24])
-    range_tmp               = 0:0.025:5;
-    for jj = 1:21
-        tick_str{jj}        = '';
-    end
-    for jj = 1:4:21
-        tick_str{jj}        = num2str(range_tmp(jj));
-    end
-    tick_str{end}           = ['>' tick_str{end}];
-    colorbar('location', 'northoutside', 'fontsize', 20, 'limits', [4 24], 'xtick', 4:24, 'xticklabel', tick_str);
-    text(-2.7, 1.6, 'B', 'color', 'k', 'fontsize', 20, 'fontweight', 'bold')
-    text(-2.5, 3.7, 'Fraction of grid points (%)', 'color', 'k', 'fontsize', 20)    
-    box on
+    linkaxes(ax)
     
 %% FIGURE 3 OLD: HORIZONTAL AND VERTICAL ACCELERATION AND OBS/MODEL COMPARISON
 
@@ -716,147 +927,8 @@ if plotting
     ylabel('Fraction of grid points (%)')
     text(-0.75, 21, 'D', 'fontsize', 20, 'fontweight', 'bold')
     legend('model', 'observed')
-    box on
+    box on    
     
-%% FIGURE S5: BALANCE VELOCITY HI/LO COMPARISON
-
-    figure('position', [200 200 1200 600], 'name', [num2str(1e-3 * age_max) ' ka'])
-    colormap([([135 206 235] ./ 255); ([159 89 39] ./ 255); 0.9 0.9 0.9; redblue(20)])
-    ranges                  = [-20 20; -20 20; -20 20];
-    incs                    = [2 2 2];
-    plots                   = {'speed_change_ref(:, :, end)' 'speed_change_lo(:, :, end)' 'speed_change_hi(:, :, end)'};
-    titles                  = {'$\Delta u_s$' '$\Delta u_{s\,(\min)}$' '$\Delta u_{s\,(\max)}$'};
-    spaces                  = [8 16 16];
-    units                   = {'m a^{-1}' 'm a^{-1}' 'm a^{-1}'};
-    letters                 = 'A':'C';
-    [ax, cb1, cb2]          = deal(zeros(1, 3));
-    for ii = 1:3
-        ax(ii)              = subplot('position', [(-0.005 + (0.335 * (ii - 1))) 0.02 0.325 0.9]);
-        hold on
-        range_tmp           = ranges(ii, 1):incs(ii):ranges(ii, 2);
-        plot_tmp            = eval(plots{ii});
-        plot_tmp(~mask_D1_decim) ...
-                            = NaN;
-        plot_tmp            = 3 + interp1((range_tmp(1:(end - 1)) + (diff(range_tmp) ./ 2)), 1:20, plot_tmp, 'nearest', 'extrap');
-        plot_tmp(isnan(plot_tmp)) ...
-                            = mask_combo_decim(isnan(plot_tmp)) + 1;
-        imagesc(x_decim(1, :), y_decim(:, 1), plot_tmp)
-        [pp, pm, pb]        = deal(zeros(1, length(x_paral)), zeros(1, length(x_merid)), zeros(1, length(num_basin)));
-        for jj = 1:length(x_paral)
-            pp(jj)          = plot((1e-3 .* x_paral{jj}), (1e-3 .* y_paral{jj}), 'k--', 'linewidth', 1);
-        end
-        for jj = 1:length(x_merid)
-            pm(jj)          = plot((1e-3 .* x_merid{jj}), (1e-3 .* y_merid{jj}), 'k--', 'linewidth', 1);
-        end
-        for jj = 1:num_coast
-            plot(x_coast{jj}, y_coast{jj}, 'color', [0.5 0.5 0.5], 'linewidth', 1)
-        end
-        for jj = 1:num_basin
-            pb(jj)          = plot(x_basin{jj}, y_basin{jj}, 'color', 'k', 'linewidth', 2);
-        end
-        plot(x_D1_ord, y_D1_ord, 'm', 'linewidth', 2)
-        caxis([1 24])
-        axis equal
-        axis([x_min x_max y_min y_max])
-        box on
-        set(gca, 'fontsize', 20, 'layer', 'top', 'xtick', [], 'ytick', [])
-        text(825, -525, ['(' units{ii} ')'], 'color', 'k', 'fontsize', 20)
-        fill([325 450 450 325], [-3230 -3230 -3260 -3260], 'k')
-        fill([450 575 575 450], [-3230 -3230 -3260 -3260], 'w', 'edgecolor', 'k')
-        text(300, -3180, '0', 'color', 'k', 'fontsize', 18)
-        text(520, -3180, '250 km', 'color', 'k', 'fontsize', 18)
-        text(-550, -800, repmat(' ', 1, (spaces(ii) + 1)), 'color', 'k', 'fontsize', 22, 'fontweight', 'bold', 'edgecolor', 'k', 'backgroundcolor', 'w')
-        text(-550, -800, [letters(ii) repmat(' ', 1, spaces(ii))], 'color', 'k', 'fontsize', 20, 'fontweight', 'bold')
-        text(-450, -810, titles{ii}, 'color', 'k', 'fontsize', 20, 'interpreter', 'latex')
-        text(-607, -3215, '60\circN', 'color', 'k', 'fontsize', 18, 'rotation', -10)
-        text(-334, -3250, '50\circW', 'color', 'k', 'fontsize', 18, 'rotation', 82)
-        text(483, -2771, '65\circN', 'color', 'k', 'fontsize', 18, 'rotation', 14)
-        text(717, -2897, '30\circW', 'color', 'k', 'fontsize', 18, 'rotation', -75)
-        tick_str            = cell(1, 21);
-        for jj = 1:21
-            tick_str{jj}    = '';
-        end
-        for jj = 1:2:21
-            tick_str{jj}    = num2str(range_tmp(jj));
-        end
-        tick_str{1}         = ['<' tick_str{1}];
-        tick_str{end}       = ['>' tick_str{end}];
-        cb1(ii)             = colorbar('fontsize', 20, 'location', 'eastoutside', 'limits', [4 24], 'ytick', 4:24, 'yticklabel', tick_str);
-    end
-    linkaxes(ax)
-    
-%% SHEAR-LAYER THICKNESS AND SHAPE FACTOR (FIG. S3)
-
-    figure('position', [200 200 880 640])
-    colormap([([135 206 235] ./ 255); ([159 89 39] ./ 255); 0.9 0.9 0.9; jet(20)])
-    ranges                  = [0 2000; 0.9 1];
-    incs                    = [100     0.005];
-    plots                   = {'squeeze(thick_shear_filt(:, :, end))' 'squeeze(shape_filt(:, :, end))'};
-    titles                  = {'$h$' '$\phi(z_{9\,\mathrm{ka}})$'};
-    spaces                  = [4 13];
-    units                   = {'m' ''};
-    letters                 = 'A':'B';
-    [ax, cb1, cb2]          = deal(zeros(1, 2));
-    for ii = 1:2
-        ax(ii)              = subplot('position', [(0.005 + (0.49 * (ii - 1))) 0.03 0.48 0.90]);
-        hold on
-        range_tmp           = ranges(ii, 1):incs(ii):ranges(ii, 2);
-        plot_tmp            = eval(plots{ii});
-        plot_tmp(~mask_D1_decim) ...
-                            = NaN;
-        plot_tmp            = 3 + interp1((range_tmp(1:(end - 1)) + (diff(range_tmp) ./ 2)), 1:20, plot_tmp, 'nearest', 'extrap');
-        plot_tmp(isnan(plot_tmp)) ...
-                            = mask_combo_decim(isnan(plot_tmp)) + 1;
-        imagesc(x_decim(1, :), y_decim(:, 1), plot_tmp)
-        [pp, pm, pb]        = deal(zeros(1, length(x_paral)), zeros(1, length(x_merid)), zeros(1, length(num_basin)));
-        for jj = 1:length(x_paral)
-            pp(jj)          = plot((1e-3 .* x_paral{jj}), (1e-3 .* y_paral{jj}), 'k--', 'linewidth', 1);
-        end
-        for jj = 1:length(x_merid)
-            pm(jj)          = plot((1e-3 .* x_merid{jj}), (1e-3 .* y_merid{jj}), 'k--', 'linewidth', 1);
-        end
-        for jj = 1:num_coast
-            plot(x_coast{jj}, y_coast{jj}, 'color', [0.5 0.5 0.5], 'linewidth', 1)
-        end
-        for jj = 1:num_basin
-            pb(jj)          = plot(x_basin{jj}, y_basin{jj}, 'color', 'k', 'linewidth', 2);
-        end
-        plot(x_D1_ord, y_D1_ord, 'm', 'linewidth', 1)
-        caxis([1 24])
-        axis equal
-        axis([x_min x_max y_min y_max])
-        box on
-        set(gca, 'fontsize', 20, 'layer', 'top', 'xticklabel', {}, 'yticklabel', {})
-        if ~isempty(units{ii})
-            text(900, -550, ['(' units{ii} ')'], 'color', 'k', 'fontsize', 20)
-        end
-        fill([325 450 450 325], [-3230 -3230 -3260 -3260], 'k')
-        fill([450 575 575 450], [-3230 -3230 -3260 -3260], 'w', 'edgecolor', 'k')
-        text(300, -3180, '0', 'color', 'k', 'fontsize', 18)
-        text(520, -3180, '250 km', 'color', 'k', 'fontsize', 18)
-        text(-550, -800, repmat(' ', 1, (spaces(ii) + 1)), 'color', 'k', 'fontsize', 22, 'fontweight', 'bold', 'edgecolor', 'k', 'backgroundcolor', 'w')        
-        text(-550, -800, [letters(ii) repmat(' ', 1, spaces(ii))], 'color', 'k', 'fontsize', 20, 'fontweight')
-        text(-450, -810, titles{ii}, 'color', 'k', 'fontsize', 20, 'fontweight', 'bold', 'interpreter', 'latex')
-        text(-607, -3215, '60\circN', 'color', 'k', 'fontsize', 18, 'rotation', -10)
-        text(-334, -3250, '50\circW', 'color', 'k', 'fontsize', 18, 'rotation', 82)
-        text(483, -2771, '65\circN', 'color', 'k', 'fontsize', 18, 'rotation', 15)
-        text(717, -2897, '30\circW', 'color', 'k', 'fontsize', 18, 'rotation', -75)
-        tick_str            = cell(1, 21);
-        for jj = 2:2:21
-            tick_str{jj}= '';
-        end
-        for jj = 1:2:21
-            tick_str{jj}= num2str(ranges(ii, 1) + (incs(ii) * (jj - 1)));
-        end
-        tick_str{1}         = ['<' tick_str{1}];
-        tick_str{end}       = ['>' tick_str{end}];
-        cb1(ii)              = colorbar('fontsize', 20, 'location', 'eastoutside', 'limits', [4 24], 'ytick', 4:24, 'yticklabel', tick_str);
-%         set(cb1(ii), 'visible', 'off')
-%         cb2(ii)             = cbarf([4 24], 4:24, 'vertical', 'linear');
-%         set(cb2(ii), 'fontsize', 20, 'ytick', 4:24, 'yticklabel', tick_str, 'position', get(cb1(ii), 'position'));
-    end
-    linkaxes(ax)
-   
 %% BALANCE-VELOCITY AND CHANGE ONLY
 
     figure('position', [200 200 880 640])
@@ -1261,87 +1333,9 @@ if plotting
     end
     close(mp4)
 
-%% ACCUMULATION-RATE COMPARISON (FIG. S4)
 
-    figure('position', [200 200 1600 600], 'renderer', 'zbuffer')
-    colormap([([135 206 235] ./ 255); ([159 89 39] ./ 255); 0.9 0.9 0.9; jet(20)])
-    ranges                  = [0 60; 0 60; -10 10; -50 50];
-    incs                    = [3 3 1 5];
-    plots                   = {'1e2 .* squeeze(accum_filt(:, :, end))' '1e2 .* accum_RACMO2_decim' '1e2 .* accum_diff' '1e2 .* accum_diff_rel'};
-    titles                  = {'$\dot{b}_{9\,\mathrm{ka}}$' '$\dot{b}_{1961-1990}$' '$\Delta \dot{b}$' '$\Delta \dot{b}/\dot{b}_{1961-1990}$'};
-    units                   = {'(cm a^{-1})' '(cm a^{-1})' '(cm a^{-1})' '(%)'};
-    spaces                  = [8 17 7 23];
-    unitsx                  = [0 0 25 60];
-    letters                 = 'A':'D';
-    [ax, cb, cb2]           = deal(zeros(1, 4));
-    for ii = 1:4
-        ax(ii)              = subplot('position', [(-0.005 + (0.25 * (ii - 1))) 0.02 0.245 0.9]);
-        hold on
-        plot_tmp            = eval(plots{ii});
-        if (ii ~= 2)
-            plot_tmp(~mask_D1_decim) ...
-                            = NaN;
-        end
-        range_tmp           = ranges(ii, 1):incs(ii):ranges(ii, 2);
-        plot_tmp            = 3 + interp1((range_tmp(1:(end - 1)) + (diff(range_tmp) ./ 2)), 1:20, plot_tmp, 'nearest', 'extrap');
-        plot_tmp(isnan(plot_tmp)) ...
-                            = mask_combo_decim(isnan(plot_tmp)) + 1;
-        imagesc(x_grd(1, :), y_grd(:, 1), plot_tmp)
-        for jj = 1:num_coast
-            plot(x_coast{jj}, y_coast{jj}, 'color', [0.5 0.5 0.5], 'linewidth', 1)
-        end
-        for jj = 1:length(x_paral)
-            plot((1e-3 .* x_paral{jj}), (1e-3 .* y_paral{jj}), '--', 'linewidth', 0.5, 'color', [0.5 0.5 0.5])
-        end
-        for jj = 1:length(x_merid)
-            plot((1e-3 .* x_merid{jj}), (1e-3 .* y_merid{jj}), '--', 'linewidth', 0.5, 'color', [0.5 0.5 0.5])
-        end
-        for jj = 1:num_basin
-            plot(x_basin{jj}, y_basin{jj}, 'color', 'k', 'linewidth', 2)
-        end
-        plot(x_D1_ord, y_D1_ord, 'm', 'linewidth', 2)
-        fill([325 450 450 325], [-3230 -3230 -3260 -3260], 'k')
-        fill([450 575 575 450], [-3230 -3230 -3260 -3260], 'w', 'edgecolor', 'k')
-        text(300, -3180, '0', 'color', 'k', 'fontsize', 18)
-        text(520, -3180, '250 km', 'color', 'k', 'fontsize', 18)
-        caxis([1 23])
-        axis equal
-        axis([x_min x_max y_min y_max])
-        box on
-        set(gca, 'fontsize', 20, 'layer', 'top', 'xtick', [], 'ytick', [], 'xticklabel', {}, 'yticklabel', {})
-        text((825 + unitsx(ii)), -525, units{ii}, 'color', 'k', 'fontsize', 20)
-        text(-607, -3215, '60\circN', 'color', 'k', 'fontsize', 18, 'rotation', -10)
-        text(-334, -3250, '50\circW', 'color', 'k', 'fontsize', 18, 'rotation', 82)
-        text(483, -2771, '65\circN', 'color', 'k', 'fontsize', 18, 'rotation', 14)
-        text(717, -2897, '30\circW', 'color', 'k', 'fontsize', 18, 'rotation', -75)
-        text(-550, -800, repmat(' ', 1, (spaces(ii) + 1)), 'color', 'k', 'fontsize', 22, 'fontweight', 'bold', 'edgecolor', 'k', 'backgroundcolor', 'w')
-        text(-550, -800, [letters(ii) repmat(' ', 1, spaces(ii))], 'color', 'k', 'fontsize', 20, 'fontweight', 'bold')
-        text(-450, -810, titles{ii}, 'color', 'k', 'fontsize', 20, 'fontweight', 'bold', 'interpreter', 'latex')
-        tick_str            = cell(1, 21);
-        for jj = 1:2:21
-            tick_str{jj}    = num2str(ranges(ii, 1) + (incs(ii) * (jj - 1)));
-        end
-        for jj = 2:2:21
-            tick_str{jj}    = '';
-        end
-        if (ii > 2)
-            tick_str{1}     = ['<' tick_str{1}];
-        end
-        tick_str{end}       = ['>' tick_str{end}];
-        cb(ii)              = colorbar('fontsize', 20, 'location', 'eastoutside', 'limits', [4 24], 'ytick', 4:24, 'yticklabel', tick_str);
-        set(cb(ii), 'visible', 'off')
-        cb2(ii)             = cbarf([4 24], 4:24, 'vertical', 'linear');
-        set(cb2(ii), 'fontsize', 20, 'ytick', 4:24, 'yticklabel', tick_str, 'position', get(cb(ii), 'position'));
-        if any(ii == [1 2])
-            freezeColors
-            if (ii == 2)
-                colormap([([135 206 235] ./ 255); ([159 89 39] ./ 255); 0.9 0.9 0.9; redblue(20)])
-            end
-        end
-    end
-    linkaxes(ax)
     
-%% FIGURE S5 MODEL AT DYE3
+%% FIGURE S6 MODEL AT DYE2
 
     figure('position', [200 200 1200 600])
     plots                   = {'viscosity_model_dye3' 'u_model_dye3' 'w_model_dye3'};

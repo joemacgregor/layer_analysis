@@ -6,7 +6,7 @@ function varargout          = date_quasi_nye(depth_bound, age_bound, strain_rate
 %   DEPTH (m) or AGE (yr) within the layer sandwiched between two dated
 %   isochrones with depths DEPTH_BOUND (m) and AGE_BOUND (yr) by assuming
 %   that the uniform vertical strain rate within that layer. This approach
-%   is termed "quasi-Nye" dating by MacGregor et al. [in revision]. It can
+%   is termed "quasi-Nye" dating by MacGregor et al. [2015]. It can
 %   also return the best-fit strain rate. STRAIN_RATE (1/yr) is the initial
 %   guess at the uniform vertical strain rate within the layer, TOL (m) is
 %   the tolerance on the depth residual and ITER_MAX is the maximum number
@@ -19,11 +19,11 @@ function varargout          = date_quasi_nye(depth_bound, age_bound, strain_rate
 %   attenuation: Modeling approach and application to the Vostok flowline
 %   (2012), J. Geophys. Res., 117, F03022.
 %   
-%   MacGregor, J.A. et al, in revision, Radiostratigraphy and age structure
-%   of the Greenland Ice Sheet, J. Geophys. Res.
+%   MacGregor, J.A. et al, 2015, Radiostratigraphy and age structure
+%   of the Greenland Ice Sheet, J. Geophys. Res. Earth Surf., 120
 %   
 % Joe MacGregor (UTIG), Ed Waddington (UW)
-% Last updated: 09/15/14
+% Last updated: 04/09/15
 
 if (nargin ~= 7)
     error('date_strain:nargin', ['Number of arguments (' num2str(nargin) ') is not equal to 7.'])

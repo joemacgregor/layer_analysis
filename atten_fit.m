@@ -1,6 +1,6 @@
 function [chisq, atten_model] ...
                             = atten_fit(temp, atten_obs, atten_uncert, depth_inc, H, Cl, NH4, hfcp)
-% LOSS_FIT Residual between radar-observed and modeled patterns of englacial returned power.
+% ATTEN_FIT Residual between radar-observed and modeled patterns of englacial returned power.
 %   
 %   [CHISQ,ATTEN_MODEL] = ATTEN_FIT(TEMP,ATTEN_OBS,ATTEN_UNCERT,DEPTH_INC,H,CL,NH4,HFCP)
 %   calculates the chi-squared residual CHISQ between the
@@ -8,8 +8,8 @@ function [chisq, atten_model] ...
 %   LOSS_UNCERT (both in dB) of radar reflectors separated by intervals
 %   DEPTH_INC (m) at midpoint depths DEPTH_MID (m) and the pattern
 %   calculated by a temperature- and chemistry-dependent radar-attenuation
-%   model (ATTEN_MODEL, as described by ATTEN_GRIS). The mean annual
-%   surface temperature TEMP_SURF (K) and the concentrations of the soluble
+%   model (as imputted into ATTEN_GRIS). The mean annual surface
+%   temperature TEMP_SURF (K) and the concentrations of the soluble
 %   impurities H+ (H), Cl- (Cl) and NH4+ (NH4) (mol/L) are also required.
 %   HFCP is a structure defined by HFCONDPROP that provides the necessary
 %   dielectric properties.
