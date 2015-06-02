@@ -1,7 +1,7 @@
 % BALANCE_LAYERS Map balance velocity history across Greenland.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 03/18/15
+% Last updated: 04/20/15
 
 clear
 
@@ -47,7 +47,7 @@ load mat/surface_acceleration_backsteps u_accel_grd_9ka u_accel_grd_surface
 [x_min, x_max, y_min, y_max]= deal(-632, 846, -3344, -670);
 
 % surface speeds
-load mat/speed_greenland_2007-2010 x_grd y_grd speed_x speed_y
+load mat/speed_greenland_2007-2010_v2 x_grd y_grd speed_x speed_y
 [x_speed, y_speed]          = deal(x_grd, y_grd);
 clear x_grd y_grd
 
@@ -71,9 +71,7 @@ for ii = ind_clean_x
     speed_y(ind_clean_y(isnan(speed_y(ind_clean_y, ii))), ii) ...
                             = interp1(y_speed(ind_clean_y(~isnan(speed_y(ind_clean_y, ii))), ii), speed_y(ind_clean_y(~isnan(speed_y(ind_clean_y, ii))), ii), y_speed(ind_clean_y(isnan(speed_y(ind_clean_y, ii))), ii));
 end
-
-speed                       = sqrt((speed_x .^ 2) + (speed_y .^ 2));
-
+%%
 % load Bamber et al. (2013) data
 load mat/greenland_bed_v3 mask_gris mask_land x y
 [mask_gris, mask_land]      = deal(mask_gris(((y(:, 1) >= y_min) & (y(:, 1) <= y_max)), ((x(1, :) >= x_min) & (x(1, :) <= x_max))), mask_land(((y(:, 1) >= y_min) & (y(:, 1) <= y_max)), ((x(1, :) >= x_min) & (x(1, :) <= x_max))));
@@ -414,7 +412,7 @@ if plotting
         fill([450 575 575 450], [-3230 -3230 -3260 -3260], 'w', 'edgecolor', 'k')
         text(300, -3180, '0', 'color', 'k', 'fontsize', 18)
         text(520, -3180, '250 km', 'color', 'k', 'fontsize', 18)
-        text(-550, -800, repmat(' ', 1, (spaces(ii) + 1)), 'color', 'k', 'fontsize', 22, 'fontweight', 'bold', 'edgecolor', 'k', 'backgroundcolor', 'w')        
+        text(-550, -800, repmat(' ', 1, (spaces(ii) + 1)), 'color', 'k', 'fontsize', 22, 'fontweight', 'bold', 'edgecolor', 'k', 'backgroundcolor', 'w')
         text(-550, -800, [letters(ii) repmat(' ', 1, spaces(ii))], 'color', 'k', 'fontsize', 20, 'fontweight', 'bold')
         text(-450, -810, titles{ii}, 'color', 'k', 'fontsize', 20, 'fontweight', 'bold', 'interpreter', 'latex')
         text(-607, -3215, '60\circN', 'color', 'k', 'fontsize', 18, 'rotation', -10)
