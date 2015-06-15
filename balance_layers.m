@@ -1,7 +1,7 @@
 % BALANCE_LAYERS Map layer-constrained balance velocity history across the Greenland Ice Sheet.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 06/14/15
+% Last updated: 06/15/15
 
 clear
 
@@ -17,7 +17,7 @@ plotting                    = false; % logical switch for plotting (typically fa
 
 % load parallels and meridians for plots
 if license('checkout', 'map_toolbox')
-    [x_paral, y_paral, x_merid, y_merid] ...
+    [~, ~, x_paral, y_paral, x_merid, y_merid] ...
                             = graticule_greenland([-632 846], [-3344 -670], 5, 10);
 else
     load mat/greenland_graticule x_paral y_paral x_merid y_merid
@@ -183,7 +183,7 @@ switch filt_type
                 end
         end
 end
-%%
+
 disp('Filtering non-model data...')
 
 % filter non-model decimated grids
@@ -236,7 +236,7 @@ switch scale_type
             end
         end
 end
-%%
+
 % filtered modern surface speed
 speed_filt                  = sqrt((speed_x_filt .^ 2) + (speed_y_filt .^ 2));
 
@@ -445,12 +445,12 @@ if plotting
     ranges                  = [0 2; 0 2; -20 20; -100 100];
     incs                    = [0.1  0.1  2 10];
     plots                   = {'log10(speed_bal_surf(:, :, end))' 'log10(speed_filt)' '-speed_change(:, :, end)' '-speed_change_rel(:, :, end)'};
-    titles                  = {['$u_s^{' num2str(1e-3 * age_max) '\,\mathrm{ka}}$'] '$u_s^{2007-2010}$' '$\Delta u_s$' '${\Delta}u_s/u_s^{2007-2010}$'};
+    titles                  = {['$u_s^{' num2str(1e-3 * age_max) '\,\mathrm{ka}}$'] '$u_s^{modern}$' '$\Delta u_s$' '${\Delta}u_s/u_s^{modern}$'};
     units                   = {'m a^{-1}' 'm a^{-1}' 'm a^{-1}' '%'};
     unitsx                  = [0 20 20 50];
     letters                 = 'A':'D';
-    spaces                  = [8 16 9 24];
-    [ax, cb, cb2]           = deal(zeros(1, 4));
+    spaces                  = [8 12 9 20];
+    [ax, cb, cb2]           = deal(NaN(1, 4));
     for ii = 1:4
         ax(ii)              = subplot('position', [(-0.005 + (0.245 * (ii - 1))) 0.02 0.245 0.9]);
         hold on
@@ -635,7 +635,7 @@ if plotting
     spaces                  = [5 13];
     units                   = {'m' ''};
     letters                 = 'A':'B';
-    [ax, cb1, cb2]          = deal(zeros(1, 2));
+    ax                      = NaN(1, 2);
     for ii = 1:2
         ax(ii)              = subplot('position', [(0.005 + (0.49 * (ii - 1))) 0.03 0.48 0.90]);
         hold on
@@ -660,7 +660,7 @@ if plotting
         for jj = 1:num_basin
             pb(jj)          = plot(x_basin{jj}, y_basin{jj}, 'color', 'k', 'linewidth', 2);
         end
-        plot(x_D1_ord, y_D1_ord, 'm', 'linewidth', 1)
+        plot(x_D1_ord, y_D1_ord, 'm', 'linewidth', 2)
         caxis([1 24])
         axis equal
         axis([x_min x_max y_min y_max])
@@ -682,14 +682,14 @@ if plotting
         text(717, -2897, '30\circW', 'color', 'k', 'fontsize', 18, 'rotation', -75)
         tick_str            = cell(1, 21);
         for jj = 2:2:21
-            tick_str{jj}= '';
+            tick_str{jj}    = '';
         end
         for jj = 1:2:21
-            tick_str{jj}= num2str(ranges(ii, 1) + (incs(ii) * (jj - 1)));
+            tick_str{jj}    = num2str(ranges(ii, 1) + (incs(ii) * (jj - 1)));
         end
         tick_str{1}         = ['<' tick_str{1}];
         tick_str{end}       = ['>' tick_str{end}];
-        cb1(ii)             = colorbar('fontsize', 20, 'location', 'eastoutside', 'limits', [4 24], 'ytick', 4:24, 'yticklabel', tick_str, 'ticklength', 0.035);
+        colorbar('fontsize', 20, 'location', 'eastoutside', 'limits', [4 24], 'ytick', 4:24, 'yticklabel', tick_str, 'ticklength', 0.035)
     end
     linkaxes(ax)
    
@@ -701,13 +701,14 @@ if plotting
     colormap(c1)
     ranges                  = [0 60; 0 60; -10 10; -50 50];
     incs                    = [3 3 1 5];
-    plots                   = {'1e2 .* squeeze(accum_filt(:, :, end))' '1e2 .* accum_RACMO2_decim' '1e2 .* accum_diff' '1e2 .* accum_diff_rel'};
-    titles                  = {'$\dot{b}_{9\,\mathrm{ka}}$' '$\dot{b}_{1958-2007}$' '$\Delta \dot{b}$' '$\Delta \dot{b}/\dot{b}_{1958-2007}$'};
+    plots                   = {'1e2 .* squeeze(accum_filt(:, :, end))' '1e2 .* accum_RACMO2_decim' '-1e2 .* accum_diff' '-1e2 .* accum_diff_rel'};
+    titles                  = {'$\dot{b}_{9\,\mathrm{ka}}$' '$\dot{b}_{modern}$' '$\Delta \dot{b}$' '$\Delta \dot{b}/\dot{b}_{modern}$'};
     units                   = {'(cm a^{-1})' '(cm a^{-1})' '(cm a^{-1})' '(%)'};
-    spaces                  = [8 16 7 22];
+    spaces                  = [8 12 7 18
+        ];
     unitsx                  = [0 0 25 60];
     letters                 = 'A':'D';
-    [ax, cb, cb2]           = deal(zeros(1, 4));
+    ax                      = NaN(1, 4);
     for ii = 1:4
         ax(ii)              = subplot('position', [(-0.005 + (0.25 * (ii - 1))) 0.02 0.245 0.9]);
         hold on
@@ -735,7 +736,7 @@ if plotting
         end
         plot(x_D1_ord, y_D1_ord, 'm', 'linewidth', 2)
         fill([325 450 450 325], [-3230 -3230 -3260 -3260], 'k')
-        fill([450 575 575 450], [-3230 -3230 -3260 -3260], 'w', 'edgecolor', 'k')   
+        fill([450 575 575 450], [-3230 -3230 -3260 -3260], 'w', 'edgecolor', 'k')
         text(300, -3180, '0', 'color', 'k', 'fontsize', 18)
         text(520, -3180, '250 km', 'color', 'k', 'fontsize', 18)
         caxis([1 24])
@@ -762,7 +763,7 @@ if plotting
             tick_str{1}     = ['<' tick_str{1}];
         end
         tick_str{end}       = ['>' tick_str{end}];
-        cb(ii)              = colorbar('fontsize', 20, 'location', 'eastoutside', 'ylim', [4 24], 'ytick', 4:24, 'yticklabel', tick_str, 'ticklength', 0.0375);
+        colorbar('fontsize', 20, 'location', 'eastoutside', 'ylim', [4 24], 'ytick', 4:24, 'yticklabel', tick_str, 'ticklength', 0.0375)
     end
     colormap(ax(3), c2)
     colormap(ax(4), c2)
@@ -779,7 +780,7 @@ if plotting
     spaces                  = [8 12 12];
     units                   = {'m a^{-1}' 'm a^{-1}' 'm a^{-1}'};
     letters                 = 'A':'C';
-    [ax, cb1, cb2]          = deal(zeros(1, 3));
+    ax                      = NaN(1, 3);
     for ii = 1:3
         ax(ii)              = subplot('position', [(-0.005 + (0.335 * (ii - 1))) 0.02 0.325 0.9]);
         hold on
@@ -831,7 +832,7 @@ if plotting
         end
         tick_str{1}         = ['<' tick_str{1}];
         tick_str{end}       = ['>' tick_str{end}];
-        cb1(ii)             = colorbar('fontsize', 20, 'location', 'eastoutside', 'limits', [4 24], 'ytick', 4:24, 'yticklabel', tick_str, 'ticklength', 0.0375);
+        colorbar('fontsize', 20, 'location', 'eastoutside', 'limits', [4 24], 'ytick', 4:24, 'yticklabel', tick_str, 'ticklength', 0.0375)
     end
     linkaxes(ax)
     
