@@ -1,57 +1,58 @@
-% BALANCE_LAYERS Map balance velocity history across Greenland.
+% BALANCE_LAYERS Map layer-constrained balance velocity history across the Greenland Ice Sheet.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 04/20/15
+% Last updated: 06/14/15
 
 clear
 
-age_min                     = 9e3;
-age_max                     = 9e3;
-decim                       = 5; % decimation, indices but also effectively km
-filt_type                   = 'exp'; % triang or exp
-scale_type                  = 'thick'; % ind or thick
+age_min                     = 9e3; % minimum gridded isochrone age to use, yr
+age_max                     = 9e3; % maximum gridded isochrone age to use, yr
+decim                       = 5; % decimation, indices but also effectively, km
+filt_type                   = 'exp'; % triang (triangle) or exp (exponential) shape for 2-D spatial filter to apply to 1-km grids
+scale_type                  = 'thick'; % ind (index) or thick (ice thickness) to use as size of 2-D spatial filter
 ind_filt                    = 5; % width of filter, indices, used only when scale_type=ind, should be an odd integer
 std_exp                     = 4; % decay length of filtering exponential, indices, used only when filt_type=exp and scale_type=ind
 thick_filt_ref              = 10; % number of ice thicknesses over which to run filter, used only when scale_type=thick
-plotting                    = false;
+plotting                    = false; % logical switch for plotting (typically false)
 
+% load parallels and meridians for plots
 if license('checkout', 'map_toolbox')
-    [paral, merid, x_paral, y_paral, x_merid, y_merid] ...
+    [x_paral, y_paral, x_merid, y_merid] ...
                             = graticule_greenland([-632 846], [-3344 -670], 5, 10);
 else
-    load mat/greenland_graticule paral merid x_paral y_paral x_merid y_merid
+    load mat/greenland_graticule x_paral y_paral x_merid y_merid
 end
 
-% miscellaneous variables
-load mat/grl_coast num_coast x_coast y_coast
-load mat/grl_basin num_basin x_basin y_basin
-load mat/mask_D1 mask_D1 x_D1_ord y_D1_ord
-load mat/gimp_1km elev_surf_gimp
-load mat/core_int name_core name_core_short num_core x_core y_core
-load mat/preliminary_acceleration_fields_v2 u_accel_grd w_accel_grd
+% load several variables
+load mat/grl_coast num_coast x_coast y_coast % Greenland coastline
+load mat/grl_basin num_basin x_basin y_basin % Zwally ice-drainage basins
+load mat/mask_D1 mask_D1 x_D1_ord y_D1_ord % D=1 mask and outline
+load mat/gimp_1km elev_surf_gimp % 1-km GIMP DEM
+load mat/core_int name_core name_core_short num_core x_core y_core % deep core locations and names
+
+% load Liam's various deceleration predictions
+load mat/preliminary_acceleration_fields_v2 u_accel_grd w_accel_grd % oldest set (I think)
 [accel_horiz_model, accel_vert_model] ...
                             = deal(u_accel_grd, w_accel_grd);
 [accel_horiz_model(accel_horiz_model == 0), accel_vert_model(accel_vert_model == 0)] ...
-                            = deal(NaN);
-
+                            = deal(NaN); % NaN out zeroes
 clear u_accel_grd w_accel_grd
-load mat/surface_acceleration_9ka u_accel_grd_100a u_accel_grd_1000a
+load mat/surface_acceleration_9ka u_accel_grd_100a u_accel_grd_1000a % 1-ka predictions
 [u_accel_grd_100a(u_accel_grd_100a == 0), u_accel_grd_1000a(u_accel_grd_1000a == 0)] ...
                             = deal(NaN);
-
-load mat/surface_acceleration_backsteps u_accel_grd_9ka u_accel_grd_surface
+load mat/surface_acceleration_backsteps u_accel_grd_9ka u_accel_grd_surface % 100-a and 1-ka backsteps (end up using the latter)
 [u_accel_grd_9ka(u_accel_grd_9ka == 0), u_accel_grd_surface(u_accel_grd_surface == 0)] ...
                             = deal(NaN);
 
-% x/y limits
+% x/y limits of Greenland grid
 [x_min, x_max, y_min, y_max]= deal(-632, 846, -3344, -670);
 
-% surface speeds
-load mat/speed_greenland_2007-2010_v2 x_grd y_grd speed_x speed_y
+% Ian Joughin's newest surface-speed composite
+load mat/speed_greenland_composite x_grd y_grd speed_x speed_y
 [x_speed, y_speed]          = deal(x_grd, y_grd);
 clear x_grd y_grd
 
-% trim speed grid
+% trim speed grid to map limits
 [speed_x, speed_y]          = deal(speed_x(((y_speed(:, 1) >= y_min) & (y_speed(:, 1) <= y_max)), ((x_speed(1, :) >= x_min) & (x_speed(1, :) <= x_max))), speed_y(((y_speed(:, 1) >= y_min) & (y_speed(:, 1) <= y_max)), ((x_speed(1, :) >= x_min) & (x_speed(1, :) <= x_max))));
 [x_speed, y_speed]          = deal(x_speed(((y_speed(:, 1) >= y_min) & (y_speed(:, 1) <= y_max)), ((x_speed(1, :) >= x_min) & (x_speed(1, :) <= x_max))), y_speed(((y_speed(:, 1) >= y_min) & (y_speed(:, 1) <= y_max)), ((x_speed(1, :) >= x_min) & (x_speed(1, :) <= x_max))));
 
@@ -71,45 +72,44 @@ for ii = ind_clean_x
     speed_y(ind_clean_y(isnan(speed_y(ind_clean_y, ii))), ii) ...
                             = interp1(y_speed(ind_clean_y(~isnan(speed_y(ind_clean_y, ii))), ii), speed_y(ind_clean_y(~isnan(speed_y(ind_clean_y, ii))), ii), y_speed(ind_clean_y(isnan(speed_y(ind_clean_y, ii))), ii));
 end
-%%
-% load Bamber et al. (2013) data
+
+% load Bamber et al. (2013) masks
 load mat/greenland_bed_v3 mask_gris mask_land x y
 [mask_gris, mask_land]      = deal(mask_gris(((y(:, 1) >= y_min) & (y(:, 1) <= y_max)), ((x(1, :) >= x_min) & (x(1, :) <= x_max))), mask_land(((y(:, 1) >= y_min) & (y(:, 1) <= y_max)), ((x(1, :) >= x_min) & (x(1, :) <= x_max))));
 clear x y
-mask_combo                  = double(mask_land);
-mask_combo(mask_gris)       = 2;
+mask_combo                  = double(mask_land); % convert logical to double 
+mask_combo(mask_gris)       = 2; % ice sheet in mask_combo is 2, other land is 1, sea is 0
 
-% load Morlighem et al. (2014)
+% load Morlighem et al. (2014) ice thickness (v2)
 load mat/greenland_mc_bed_1km thick
 
-% load CISM data
+% load CISM data, i.e., RACMO2 ice-equivalent accumulation rate
 load mat/greenland_cism accum x y
-accum_RACMO2                = accum(((y(:, 1) >= y_min) & (y(:, 1) <= y_max)), ((x(1, :) >= x_min) & (x(1, :) <= x_max)));
+accum_RACMO2                = accum(((y(:, 1) >= y_min) & (y(:, 1) <= y_max)), ((x(1, :) >= x_min) & (x(1, :) <= x_max))); % trim to limits
 clear accum x y
 
 % load gridded isochrones and uncertainties
 % load mat/age_grd2 age_iso depth_iso2 x_grd y_grd
-load mat/age_grd2_krige age_iso depth_iso2 depth_uncert_iso2 num_age_iso x_grd y_grd
+load mat/age_grd2_krige age_iso depth_iso2 depth_uncert_iso2 num_age_iso x_grd y_grd % load kriged grids
 [num_y, num_x]              = size(x_grd);
 
-% dimensionalize isochrones by ice thickness
+% dimensionalize isochrone depth by gridded ice thickness
 [depth_iso2, depth_uncert_iso2] ...
                             = deal((depth_iso2 .* thick(:, :, ones(1, 1, num_age_iso))), (depth_uncert_iso2 .* thick(:, :, ones(1, 1, num_age_iso))));
 
-% valid isochrone ages
+% find valid isochrone ages, given desired min/max
 ind_age_iso                 = find((age_iso >= age_min) & (age_iso <= age_max));
 num_iso                     = length(ind_age_iso);
 
-% trim gridded isochrone set
+% trim gridded isochrone set to ages of interest (currently just 9 ka)
 age_iso                     = age_iso(ind_age_iso);
 [depth_iso, depth_iso_uncert] ...
                             = deal(depth_iso2(:, :, ind_age_iso), depth_uncert_iso2(:, :, ind_age_iso));
 clear depth_iso2 depth_uncert_iso2
 
-% load and sort strain-rate modeling
-% [accum, strain_rate, thick_shear] ...
+% load and sort 1-D strain-rate modeling results
 [strain_rate, strain_rate_lo, strain_rate_hi, thick_shear, thick_shear_lo, thick_shear_hi] ...
-                            = deal(NaN(size(x_grd, 1), size(x_grd, 2), num_iso));
+                            = deal(NaN(size(x_grd, 1), size(x_grd, 2), num_iso)); % initialize some variables
 % for ii = 1:num_iso
 %     tmp                     = load(['mat/strain_all_' num2str(1e-3 * age_iso(ii)) 'ka.mat'], 'accum_shallow_grd', 'strain_rate_grd', 'thick_shear_grd');
 %     [accum(:, :, ii), strain_rate(:, :, ii), thick_shear(:, :, ii)] ...
@@ -117,9 +117,9 @@ clear depth_iso2 depth_uncert_iso2
 % end
 load mat/strain_all_9ka_krige accum_shallow_grd strain_rate_grd thick_shear_grd accum_shallow_lo_grd accum_shallow_hi_grd strain_rate_lo_grd strain_rate_hi_grd thick_shear_lo_grd thick_shear_hi_grd
 [accum, strain_rate(:, :, end), thick_shear(:, :, end)] ...
-                            = deal(accum_shallow_grd, strain_rate_grd(:, :, end), thick_shear_grd);
+                            = deal(accum_shallow_grd, strain_rate_grd(:, :, end), thick_shear_grd); % assign from gridded variables
 [accum_lo, accum_hi, strain_rate_lo(:, :, end), strain_rate_hi(:, :, end), thick_shear_lo(:, :, end), thick_shear_hi(:, :, end)] ...
-                            = deal(accum_shallow_lo_grd, accum_shallow_hi_grd, strain_rate_lo_grd(:, :, end), strain_rate_hi_grd(:, :, end), thick_shear_lo_grd(:, :, end), thick_shear_hi_grd(:, :, end));
+                            = deal(accum_shallow_lo_grd, accum_shallow_hi_grd, strain_rate_lo_grd(:, :, end), strain_rate_hi_grd(:, :, end), thick_shear_lo_grd(:, :, end), thick_shear_hi_grd(:, :, end)); % assign from gridded variables
 clear accum_shallow_grd strain_rate_grd thick_shear_grd accum_shallow_lo_grd accum_shallow_hi_grd strain_rate_lo_grd strain_rate_hi_grd thick_shear_lo_grd thick_shear_hi_grd
 
 % load Marcott et al. (2013) temperature reconstruction
@@ -129,23 +129,20 @@ disp('Trimming and decimating non-model data...')
 
 % decimate regular grids
 length_grd                  = 1e3 * decim; % grid size, m
-ind_x                       = find(~mod(x_grd(1, :), decim), 1):decim:find(~mod(x_grd(1, :), decim), 1, 'last');
-ind_y                       = find(~mod(y_grd(:, 1), decim), 1):decim:find(~mod(y_grd(:, 1), decim), 1, 'last');
-[x_filt, y_filt]            = deal(x_grd(ind_y, ind_x), y_grd(ind_y, ind_x));
+ind_x                       = find(~mod(x_grd(1, :), decim), 1):decim:find(~mod(x_grd(1, :), decim), 1, 'last'); % decimated x indices
+ind_y                       = find(~mod(y_grd(:, 1), decim), 1):decim:find(~mod(y_grd(:, 1), decim), 1, 'last'); % decimated y indices
+[x_filt, y_filt]            = deal(x_grd(ind_y, ind_x), y_grd(ind_y, ind_x)); % decimated x/y grids
 
 % grid size
 [num_decim_y, num_decim_x]  = deal(length(ind_y), length(ind_x));
 
-% % decimate all standard grids
+% % decimate all standard grids that don't need filtering
 [accum_RACMO2_decim, elev_surf_gimp_decim, mask_gris_decim, mask_combo_decim, x_decim, y_decim, mask_D1_decim] ...
                             = deal(accum_RACMO2(ind_y, ind_x), elev_surf_gimp(ind_y, ind_x), mask_gris(ind_y, ind_x), mask_combo(ind_y, ind_x), x_grd(ind_y, ind_x), y_grd(ind_y, ind_x), mask_D1(ind_y, ind_x));
 
-% decimate speed grid
-% ind_x_speed                 = find(~mod(x_speed(1, :), decim), 1):(2 * decim):find(~mod(x_speed(1, :), decim), 1, 'last');
-% ind_y_speed                 = find(~mod(y_speed(:, 1), decim), 1):(2 * decim):find(~mod(y_speed(:, 1), decim), 1, 'last');
+% decimate speed grid to 1 km
 [speed_x_decim, speed_y_decim, x_speed_decim, y_speed_decim] ...
                             = deal(speed_x(1:2:end, 1:2:end), speed_y(1:2:end, 1:2:end), x_speed(1:2:end, 1:2:end), y_speed(1:2:end, 1:2:end));
-speed_decim                 = sqrt((speed_x_decim .^ 2) + (speed_y_decim .^ 2));
 
 disp('Building smoothing filter...')
 
@@ -154,56 +151,56 @@ switch filt_type
     case 'triang' % triangle/chapeau
         switch scale_type
             case 'ind' % fixed number of indices
-                filt_decim  = repmat(triang(ind_filt)', ind_filt, 1) .* repmat(triang(ind_filt), 1, ind_filt);
-                filt_decim  = filt_decim ./ sum(filt_decim(:));
+                filt_decim  = repmat(triang(ind_filt)', ind_filt, 1) .* repmat(triang(ind_filt), 1, ind_filt); % 2-D triangle filter
+                filt_decim  = filt_decim ./ sum(filt_decim(:)); % normalize so that sum = 1
             case 'thick' % variable thickness filter
-                % only need number of filter options depending on ice thickness range
+                % only need a certain number of filter options depending on ice-thickness range
                 filt_decim  = cell(1, max([1 round(1e-3 * max(thick(:)) * thick_filt_ref)]));
-                for ii = 1:length(filt_decim)
+                for ii = 1:length(filt_decim) % loop through each thickness possibility
                     if ~mod(ii, 2)
                         jj  = ii + 1;
                     else
                         jj  = ii;
                     end
                     filt_decim{ii} ...
-                            = repmat(triang(jj)', jj, 1) .* repmat(triang(jj), 1, jj);
+                            = repmat(triang(jj)', jj, 1) .* repmat(triang(jj), 1, jj); % 2-D thickness-dependent triangle filter
                     filt_decim{ii} ...
-                            = filt_decim{ii} ./ sum(filt_decim{ii}(:));
+                            = filt_decim{ii} ./ sum(filt_decim{ii}(:)); % normalized so that sum = 1
                 end
         end
     case 'exp' % exponential decay
         switch scale_type
             case 'ind'
-                filt_decim  = repmat(exp([-(((ind_filt - 1) / 2):-1:1) 0 -(1:((ind_filt - 1) / 2))] ./ std_exp), ind_filt, 1) .* repmat(exp([-(((ind_filt - 1) / 2):-1:1) 0 -(1:((ind_filt - 1) / 2))] ./ std_exp)', 1, ind_filt);
-                filt_decim  = filt_decim ./ sum(filt_decim(:));
+                filt_decim  = repmat(exp([-(((ind_filt - 1) / 2):-1:1) 0 -(1:((ind_filt - 1) / 2))] ./ std_exp), ind_filt, 1) .* repmat(exp([-(((ind_filt - 1) / 2):-1:1) 0 -(1:((ind_filt - 1) / 2))] ./ std_exp)', 1, ind_filt); % 2-D exponential filter
+                filt_decim  = filt_decim ./ sum(filt_decim(:)); % normalize so that sum = 1
             case 'thick'
                 filt_decim  = cell(1, max([1 round(1e-3 * max(thick(:)) * thick_filt_ref)]));
-                for ii = 1:length(filt_decim)
+                for ii = 1:length(filt_decim) % go through each thickness possibilitys
                     filt_decim{ii} ...
-                            = repmat(exp([-(ii:-1:1) 0 -(1:ii)] ./ thick_filt_ref), ((2 * ii) + 1), 1) .* repmat(exp([-(ii:-1:1) 0 -(1:ii)] ./ thick_filt_ref)', 1, ((2 * ii) + 1));
+                            = repmat(exp([-(ii:-1:1) 0 -(1:ii)] ./ thick_filt_ref), ((2 * ii) + 1), 1) .* repmat(exp([-(ii:-1:1) 0 -(1:ii)] ./ thick_filt_ref)', 1, ((2 * ii) + 1)); % 2-D thickness-dependent exponential filter
                     filt_decim{ii} ...
-                            = filt_decim{ii} ./ sum(filt_decim{ii}(:));
+                            = filt_decim{ii} ./ sum(filt_decim{ii}(:)); % normalize so that sum = 1
                 end
         end
 end
-
+%%
 disp('Filtering non-model data...')
 
 % filter non-model decimated grids
-vars                        = {'elev_surf_gimp' 'speed_x_decim' 'speed_y_decim' 'thick' 'accel_horiz_model' 'accel_vert_model' 'u_accel_grd_100a' 'u_accel_grd_1000a' 'u_accel_grd_9ka' 'u_accel_grd_surface'};
-vars_filt                   = {'elev_surf_gimp_filt' 'speed_x_filt' 'speed_y_filt' 'thick_filt' 'accel_horiz_model_filt' 'accel_vert_model_filt' 'accel_horiz_model_filt1' 'accel_horiz_model_filt2' 'u_accel_grd_9ka_filt' 'u_accel_grd_surface_filt'};
-num_var                     = length(vars);
+vars                        = {'elev_surf_gimp' 'speed_x_decim' 'speed_y_decim' 'thick' 'accel_horiz_model' 'accel_vert_model' 'u_accel_grd_100a' 'u_accel_grd_1000a' 'u_accel_grd_9ka' 'u_accel_grd_surface'}; % input names of grids to be filtered
+vars_filt                   = {'elev_surf_gimp_filt' 'speed_x_filt' 'speed_y_filt' 'thick_filt' 'accel_horiz_model_filt' 'accel_vert_model_filt' 'accel_horiz_model_filt1' 'accel_horiz_model_filt2' 'u_accel_grd_9ka_filt' 'u_accel_grd_surface_filt'}; % output filtered grid names
+num_var                     = length(vars); % number of variables to filter
 
 switch scale_type
-    case 'ind'
+    case 'ind' % fixed index filter
         for ii = 1:num_var
-            eval([vars_filt{ii} ' = filter2(filt_decim, ' vars{ii} ');'])
+            eval([vars_filt{ii} ' = filter2(filt_decim, ' vars{ii} ');']) % filter each variable directly (can use filter2 because filter is always the same)
         end
         filt_decim_ref      = [];
-    case 'thick'
+    case 'thick' % ice-thickness dependent filter (takes longer)
         
         for ii = 1:num_var
-            eval([vars_filt{ii} ' = NaN(num_decim_y, num_decim_x);'])
+            eval([vars_filt{ii} ' = NaN(num_decim_y, num_decim_x);']) % initialize each filtered variabile to decimated size
         end
         
         % reference set of ice thicknesses
@@ -211,11 +208,12 @@ switch scale_type
         % closest matching set of ice thicknesses
         filt_decim_ref      = interp1(thick_ref, 1:length(filt_decim), thick(ind_y, ind_x), 'nearest', 'extrap');
         
+        % loop through each column to filter
         for jj = 1:num_decim_x
             if ~mod(jj, 50)
                 disp(jj)
             end
-            for ii = 1:num_decim_y
+            for ii = 1:num_decim_y % loop through each row to filter
                 
                 % current filter matrix and half-size
                 filt_decim_curr ...
@@ -224,12 +222,12 @@ switch scale_type
                             = (size(filt_decim_curr, 1) - 1) / 2;
                 
                 % indices within original matrix
-                ind_tmp     = -num_filt_curr:num_filt_curr;
-                ii_tmp      = repmat((ind_y(ii) + ind_tmp)', ((2 * num_filt_curr) + 1), 1);
-                jj_tmp      = ind_x(jj) + ind_tmp(ones(((2 * num_filt_curr) + 1), 1), :);
+                ind_tmp     = -num_filt_curr:num_filt_curr; % reference index set
+                ii_tmp      = repmat((ind_y(ii) + ind_tmp)', ((2 * num_filt_curr) + 1), 1); % row indices to filter
+                jj_tmp      = ind_x(jj) + ind_tmp(ones(((2 * num_filt_curr) + 1), 1), :); % column indices to filter
                 jj_tmp      = jj_tmp(:);
-                ind_good    = find((ii_tmp > 0) & (jj_tmp > 0) & (ii_tmp <= num_y) & (jj_tmp <= num_x));
-                ind_curr    = sub2ind([num_y num_x], ii_tmp(ind_good), jj_tmp(ind_good));
+                ind_good    = find((ii_tmp > 0) & (jj_tmp > 0) & (ii_tmp <= num_y) & (jj_tmp <= num_x)); % deal with edges
+                ind_curr    = sub2ind([num_y num_x], ii_tmp(ind_good), jj_tmp(ind_good)); % convert row/column indices to linear indices
                 
                 % filter each variable
                 for kk = 1:num_var
@@ -238,11 +236,11 @@ switch scale_type
             end
         end
 end
-
+%%
 % filtered modern surface speed
 speed_filt                  = sqrt((speed_x_filt .^ 2) + (speed_y_filt .^ 2));
 
-% apply GrIS mask
+% apply GrIS mask to some variables
 [accum_RACMO2_decim(~mask_gris_decim), elev_surf_gimp_filt(~mask_gris_decim)] ...
                             = deal(NaN);
 
@@ -274,23 +272,23 @@ az_cos_cat(:, :, 2)         = cos(az_elev);
 speed_az_decay              = 25;
 wt_az_elev                  = exp(-speed_filt ./ speed_az_decay);
 wt_az_speed                 = 1 - wt_az_elev;
-wt_az_elev(isnan(az_speed)) = 1;
+wt_az_elev(isnan(az_speed)) = 1; % maximum weight if the other is NaN
 wt_az_speed(isnan(az_elev)) = 1;
 az_mean                     = atan2(((az_sin_cat(:, :, 1) .* wt_az_speed) + (az_sin_cat(:, :, 2) .* wt_az_elev)), ((az_cos_cat(:, :, 1) .* wt_az_speed) + (az_cos_cat(:, :, 2) .* wt_az_elev)));
 
 % % old way just simple average
 % az_mean                     = atan2(nanmean(az_sin_cat, 3), nanmean(az_cos_cat, 3));
 
-az_sin                      = sin(az_mean);
-az_cos                      = cos(az_mean);
-az_sin_sign                 = sign(az_sin);
-az_cos_sign                 = sign(az_cos);
-az_sin_abs_rel              = abs(az_sin) ./ (abs(az_sin) + abs(az_cos));
-az_cos_abs_rel              = abs(az_cos) ./ (abs(az_sin) + abs(az_cos));
+az_sin                      = sin(az_mean); % rad
+az_cos                      = cos(az_mean); % rad
+az_sin_sign                 = sign(az_sin); % sign of sin
+az_cos_sign                 = sign(az_cos); % sign of cos
+az_sin_abs_rel              = abs(az_sin) ./ (abs(az_sin) + abs(az_cos)); % normalization
+az_cos_abs_rel              = abs(az_cos) ./ (abs(az_sin) + abs(az_cos)); % normalization
 
 % reproject speeds
-[speed_x_filt, speed_y_filt]= deal((speed_filt .* az_cos), (speed_filt .* az_sin));
-speed_filt                  = sqrt((speed_x_filt .^ 2) + (speed_y_filt .^ 2));
+[speed_x_filt, speed_y_filt]= deal((speed_filt .* az_cos), (speed_filt .* az_sin)); % reprojected x/y filtered speeds
+speed_filt                  = sqrt((speed_x_filt .^ 2) + (speed_y_filt .^ 2)); % "best" surface speed
 
 % sort grid indices in terms of descending elevation
 [~, ind_sort]               = sort(elev_surf_hollow(:), 1, 'descend');
@@ -300,8 +298,8 @@ disp('Decimating and filtering strain-rate models, then doing flux balance...')
 
 [accum_filt, accum_lo_filt, accum_hi_filt, depth_filt, depth_lo_filt, depth_hi_filt, shape_filt, shape_lo_filt, shape_hi_filt, speed_bal, speed_bal_ref, speed_bal_lo, speed_bal_hi, speed_bal_surf, speed_bal_ref_surf, speed_bal_surf_lo, speed_bal_surf_hi, strain_rate_filt, strain_rate_lo_filt, ...
  strain_rate_hi_filt, thick_shear_filt, thick_shear_lo_filt, thick_shear_hi_filt, vel_vert_filt, vel_vert_lo_filt, vel_vert_hi_filt] ...
-                            = deal(NaN(num_decim_y, num_decim_x, num_iso));
-for ii = num_iso
+                            = deal(NaN(num_decim_y, num_decim_x, num_iso)); % initialize a bunch of variables
+for ii = num_iso % currently only doing 9 ka, do both regular, lo/hi and reference (RACMO2) versions
     disp([num2str(1e-3 * age_iso(ii)) ' ka...'])
     [speed_bal(:, :, ii), speed_bal_surf(:, :, ii), accum_filt(:, :, ii), strain_rate_filt(:, :, ii), thick_shear_filt(:, :, ii), shape_filt(:, :, ii), depth_filt(:, :, ii), vel_vert_filt(:, :, ii)] ...
                             = bal_vel(age_iso(ii), x_grd, y_grd, squeeze(accum(:, :, ii)), squeeze(depth_iso(:, :, ii)), squeeze(strain_rate(:, :, end)), squeeze(thick_shear(:, :, end)), mask_D1_decim, mask_gris_decim, thick_filt, az_sin_abs_rel, az_cos_abs_rel, az_sin_sign, az_cos_sign, ...
@@ -317,9 +315,28 @@ for ii = num_iso
                                       az_sin_abs_rel, az_cos_abs_rel, az_sin_sign, az_cos_sign, ind_sort, length_grd, decim, true, scale_type, filt_decim, filt_decim_ref);
 end
 
+% differences between balance and modern surface speed
+speed_change                = speed_bal_surf - speed_filt(:, :, ones(1, 1, num_iso));
+speed_change_rel            = 1e2 .* (speed_change ./ speed_filt(:, :, ones(1, 1, num_iso))); % in percent
+speed_change_ref            = speed_bal_ref_surf - speed_filt(:, :, ones(1, 1, num_iso));
+speed_change_ref_rel        = 1e2 .* (speed_change_ref ./ speed_filt(:, :, ones(1, 1, num_iso))); % in percent
+
+% hi/lo layer-constrained balance velocity differences
+speed_change_lo             = speed_bal_surf_lo - speed_filt(:, :, ones(1, 1, num_iso));
+speed_change_rel_lo         = 1e2 .* (speed_change_lo ./ speed_filt(:, :, ones(1, 1, num_iso)));
+speed_change_hi             = speed_bal_surf_hi - speed_filt(:, :, ones(1, 1, num_iso));
+speed_change_rel_hi         = 1e2 .* (speed_change_hi ./ speed_filt(:, :, ones(1, 1, num_iso)));
+
+% accumulation-rate differences between layer-modeled and RACMO2
+accum_diff                  = squeeze(accum_filt(:, :, end)) - accum_RACMO2_decim; % past - present
+accum_diff_rel              = accum_diff ./ accum_RACMO2_decim; % relative difference from present
+
+% % conventional full-thickness balance velocity
 % [speed_bal_full, speed_bal_full_surf] ...
 %                             = bal_vel(NaN, x_grd, y_grd, accum_RACMO2_decim, thick_decim, [], squeeze(thick_shear(:, :, end)), mask_D1_decim, mask_gris_decim, thick_decim, az_sin_abs_rel, az_cos_abs_rel, az_sin_sign, az_cos_sign, ind_sort, length_grd, decim, true, scale_type, filt_decim, ...
 %                                       filt_decim_ref);
+% speed_change_full           = speed_bal_full_surf - speed_filt;
+% speed_change_rel_full       = 1e2 .* (speed_change_full ./ speed_filt);
 
 % % convert long-term averages to short-term history
 % [accum_hist, speed_bal_surf_hist] ...
@@ -329,26 +346,9 @@ end
 %                             = (age_iso(ii + 1) / diff(age_iso([ii (ii + 1)]))) .* squeeze(speed_bal_surf(:, :, (ii + 1)) - ((age_iso(ii) / age_iso(ii + 1)) .* speed_bal_surf(:, :, ii)));
 %     accum_hist(:, :, ii)    = (age_iso(ii + 1) / diff(age_iso([ii (ii + 1)]))) .* squeeze(accum_filt(:, :, (ii + 1)) - ((age_iso(ii) / age_iso(ii + 1)) .* accum_filt(:, :, ii)));
 % end
-
-% differences with modern speeds and accumulation rates
-speed_change                = speed_bal_surf - speed_filt(:, :, ones(1, 1, num_iso));
-speed_change_rel            = 100 .* (speed_change ./ speed_filt(:, :, ones(1, 1, num_iso)));
-speed_change_ref            = speed_bal_ref_surf - speed_filt(:, :, ones(1, 1, num_iso));
-speed_change_ref_rel        = 100 .* (speed_change_ref ./ speed_filt(:, :, ones(1, 1, num_iso)));
-
-% speed_change_full           = speed_bal_full_surf - speed_filt;
-% speed_change_rel_full       = 100 .* (speed_change_full ./ speed_filt);
-speed_change_lo             = speed_bal_surf_lo - speed_filt(:, :, ones(1, 1, num_iso));
-speed_change_rel_lo         = 100 .* (speed_change_lo ./ speed_filt(:, :, ones(1, 1, num_iso)));
-speed_change_hi             = speed_bal_surf_hi - speed_filt(:, :, ones(1, 1, num_iso));
-speed_change_rel_hi         = 100 .* (speed_change_hi ./ speed_filt(:, :, ones(1, 1, num_iso)));
-
 % speed_hist_change           = speed_bal_surf_hist - speed_filt(:, :, ones(1, 1, (num_iso - 1)));
-% speed_hist_change_rel       = 100 .* (speed_hist_change ./ speed_filt(:, :, ones(1, 1, (num_iso - 1))));
+% speed_hist_change_rel       = 1e2 .* (speed_hist_change ./ speed_filt(:, :, ones(1, 1, (num_iso - 1))));
 % accum_change                = accum_hist - accum_RACMO2_decim(:, :, ones(1, 1, (num_iso - 1)));
-
-accum_diff                  = squeeze(accum_filt(:, :, end)) - accum_RACMO2_decim;
-accum_diff_rel              = accum_diff ./ accum_RACMO2_decim;
 
 %%
 if plotting
@@ -623,7 +623,7 @@ if plotting
     text(-2.5, 3.7, 'Fraction of grid points (%)', 'color', 'k', 'fontsize', 20)
     box on
     colormap(ax(2), c2)
-            
+    
 %% SHEAR-LAYER THICKNESS AND SHAPE FACTOR (FIG. S3)
 
     figure('position', [200 200 880 640], 'color', 'w', 'renderer', 'zbuffer')

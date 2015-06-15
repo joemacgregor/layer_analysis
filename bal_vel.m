@@ -3,10 +3,9 @@ function [speed_bal, speed_bal_surf, accum, strain_rate, thick_shear, shape_fact
 % BAL_VEL Age-constrained balance velocity.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 06/19/14
+% Last updated: 06/14/15
 
 % decimation indices
-
 ind_x                       = find(~mod(x(1, :), decim), 1):decim:find(~mod(x(1, :), decim), 1, 'last');
 ind_y                       = find(~mod(y(:, 1), decim), 1):decim:find(~mod(y(:, 1), decim), 1, 'last');
 
@@ -14,7 +13,7 @@ ind_y                       = find(~mod(y(:, 1), decim), 1):decim:find(~mod(y(:,
 [num_y, num_x]              = size(x);
 [num_decim_y, num_decim_x]  = deal(length(ind_y), length(ind_x));
 
-% filter grids
+% filter grids as before
 if do_filt
     vars                    = {'thick_shear'};
     if ~isnan(age)
@@ -60,7 +59,7 @@ if do_filt
     end
 end
 
-% mask D<=1 and GrIS
+% mask to D<=1 and GrIS
 [accum(~mask_D1 | ~mask_gris), depth(~mask_gris), strain_rate(~mask_D1 | ~mask_gris), thick_shear(~mask_D1 | ~mask_gris)] ...
                             = deal(NaN);
 
@@ -72,21 +71,21 @@ if ~isempty(find((depth > (thick - thick_shear)), 1))
     ind_deep                = find(depth > (thick - thick_shear));
     shape_fact(ind_deep)    = 1 - (((depth(ind_deep) - (thick(ind_deep) - thick_shear(ind_deep))) .^ 2) ./ (2 .* thick_shear(ind_deep) .* depth(ind_deep)));
 end
-shape_fact(shape_fact < 0)  = NaN;
+shape_fact(shape_fact < 0)  = NaN; % NaN out bad shape factors
 
 % vertical velocity at age_ref or zero if full thickness
 if ~isnan(age)
-    vel_vert                = accum .* exp(-strain_rate .* age);
+    vel_vert                = accum .* exp(-strain_rate .* age); % m/a
 else
     vel_vert                = zeros(size(accum));
 end
 
 % vertical input minus output rate locally and sanity check
-vert_rate                   = accum - vel_vert;
+vert_rate                   = accum - vel_vert; % vertical balance, m/a
 vert_rate(vert_rate < 0)    = 0;
 vert_rate(vert_rate > accum)= accum(vert_rate > accum);
 
-% initial balance flux (vertical only), flux from surface accumulation subtracted by vertical velocity through the isochrone, m^3 ice/yr
+% initial balance volume flux (vertical only), flux from surface accumulation subtracted by vertical velocity through the isochrone, m^3 ice/yr
 flux_bal                    = (length_grd ^ 2) .* vert_rate;
 
 % matrix indices of good input fluxes
@@ -108,5 +107,5 @@ for ii = 1:length(ind_sort)
 end
 
 % balance velocity (also surface-corrected)
-speed_bal                   = flux_bal ./ (length_grd .* depth);
-speed_bal_surf              = speed_bal ./ shape_fact;
+speed_bal                   = flux_bal ./ (length_grd .* depth); % correct for volume dimensions
+speed_bal_surf              = speed_bal ./ shape_fact; % correct for shape factor
