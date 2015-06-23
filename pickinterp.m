@@ -1,19 +1,19 @@
-function pickinterp(dir_merge, file_merge, dir_data, file_data_all, frame_or_pk, dir_pk_orig)
+function pk                 = pickinterp(dir_merge, file_merge, dir_data, file_data_all, frame_or_pk, do_save, dir_pk_orig)
 % PICKINTERP Interpolates merged picked layers back into the same format as the original CReSIS data frames.
 %
-%   PICKINTERP(DIR_MERGE, FILE_MERGE, DIR_DATA, FILE_DATA_ALL, FRAME_OR_PK, DIR_PK_ORIG)
+%   PK = PICKINTERP(DIR_MERGE, FILE_MERGE, DIR_DATA, FILE_DATA_ALL, FRAME_OR_PK, DO_SAVE, DIR_PK_ORIG)
 %   loads the merged pick file FILE_MERGE from the directory DIR_MERGE and
 %   interpolates them back onto the positions of the original CReSIS data
 %   files for that transect stored in DIR_DATA that follow the naming
 %   sequence FILE_DATA_ALL. If FRAME_OR_PK is set to 'frame', then the
 %   picks are saved to the frame. If set to 'pk', the interpolated picks
 %   are saved in DIR_PK_ORIG using the naming sequence of the merged pick
-%   files.
+%   files. If DO_SAVE = true, then the saving occurs.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 09/30/14
+% Last updated: 06/23/15
 
-if ~any(nargin == [5 6])
+if ~any(nargin == [6 7])
     error('pickinterp:nargin', 'Incorrect number of input arguments.')
 end
 if ~ischar(dir_merge)
@@ -38,12 +38,15 @@ if ~ischar(frame_or_pk)
     error('pickinterp:frameorpkstr', 'FRAME_OR_PK is not a string.')
 end
 if ~any(strcmp(frame_or_pk, {'frame' 'pk'}))
-    error('pickinterp:frameorpk', 'FRAME_OR_PK is not a ''frame'' or ''pk''.')    
+    error('pickinterp:frameorpk', 'FRAME_OR_PK is not a ''frame'' or ''pk''.')
 end
-if (strcmp(frame_or_pk, 'frame') && (nargin ~= 6))
+if (~islogical(do_save) || ~isscalar(do_save))
+    error('pickinterp:dosave', 'DO_SAVE is not a logical scalar.')
+end
+if (strcmp(frame_or_pk, 'frame') && do_save && (nargin ~= 7))
     error('pickinterp:frameorpkdir', 'FRAME_OR_PK=''frame'' but DIR_PK_ORIG is not provided.')
 end
-if strcmp(frame_or_pk, 'frame')
+if (strcmp(frame_or_pk, 'frame') && do_save)
     if ~ischar(dir_pk_orig)
         error('pickinterp:dirpkorigstr', 'Picks output directory (DIR_PK_ORIG) is not a string.')
     end
@@ -72,11 +75,11 @@ if ~num_data
 end
 
 var_layer                   = {'depth' 'depth_smooth' 'elev' 'elev_gimp' 'elev_smooth' 'elev_smooth_gimp' 'ind_y' 'ind_y_smooth' 'int' 'int_smooth' 'twtt' 'twtt_ice' 'twtt_ice_smooth' 'twtt_smooth'}; % layer variables
-num_var_layer               = length(var_layer);
-
-var_pos                     = {'dist' 'elev_air' 'elev_air_gimp' 'elev_bed' 'elev_bed_gimp' 'elev_surf' 'elev_surf_gimp' 'int_bed' 'int_surf' 'lat' 'lon' 'time' 'twtt_bed' 'twtt_surf' 'x' 'y'}; % position variables
+var_pos                     = {'dist' 'dist_lin' 'elev_air' 'elev_air_gimp' 'elev_bed' 'elev_bed_gimp' 'elev_surf' 'elev_surf_gimp' 'lat' 'lon' 'time' 'twtt_bed' 'twtt_surf' 'x' 'y'}; % position variables
 
 disp(['Evaluating ' num2str(num_data) ' frame(s) in ' dir_data ' for overlap...'])
+
+pk                          = [];
 
 for ii = 1:num_data
     
@@ -84,6 +87,7 @@ for ii = 1:num_data
     frame                   = load([dir_data file_data{ii}]);
     if ~isfield(frame, 'GPS_time')
         disp([file_data{ii}(1:(end - 4)) ' does not contain Time variable. Try again.'])
+        pk                  = [];
         return
     end
     
@@ -100,11 +104,23 @@ for ii = 1:num_data
     
     % indices in current merged file that match current data frame
     ind_curr                = NaN(1, num_trace_curr);
+    if (length(unique(pk_merge.time)) < length(pk_merge.time))
+        disp('MERGE FILE TIME NON-UNIQUESS?!')
+        [tmp1, tmp2]        = unique(pk_merge.time);
+    end
+    
     for jj = 1:num_trace_curr
         if ~isempty(find((frame.GPS_time(jj) == pk_merge.time), 1))
             ind_curr(jj)    = find((frame.GPS_time(jj) == pk_merge.time), 1);
         else
-            ind_time        = interp1(pk_merge.time, 1:pk_merge.num_trace_tot, frame.GPS_time(jj), 'nearest');
+            try
+                ind_time    = interp1(pk_merge.time, 1:pk_merge.num_trace_tot, frame.GPS_time(jj), 'nearest');
+            catch
+                ind_time    = interp1(tmp1, 1:length(tmp1), frame.GPS_time(jj), 'nearest');
+                try
+                    ind_time= tmp2(ind_time);
+                end
+            end
             if isnan(ind_time)
                 continue
             end
@@ -117,6 +133,7 @@ for ii = 1:num_data
     % evaluate matching between merged file and frame
     if all(isnan(ind_curr))
         disp([file_data{ii}(1:(end - 4)) ' (' num2str(ii) ' / ' num2str(num_data) ') has no picks.'])
+        pk                  = [];
         continue
     else
         disp([num2str(round((100 * length(find(~isnan(ind_curr)))) / num_trace_curr)) '% of ' file_data{ii}(1:(end - 4)) ' is within range of merged picks file...'])
@@ -127,7 +144,7 @@ for ii = 1:num_data
     pk.layer                = struct;
     
     % reassign layer values
-    for jj = 1:num_var_layer
+    for jj = 1:length(var_layer)
         for kk = 1:pk_merge.num_layer
             eval(['pk.layer(kk).' var_layer{jj} ' = NaN(1, num_trace_curr);'])
             if isfield(pk_merge, var_layer{jj})
@@ -144,6 +161,7 @@ for ii = 1:num_data
     
     if ~pk.num_layer % no non-NaN layers for this frame
         disp([file_data{ii}(1:(end - 4)) ' (' num2str(ii) ' / ' num2str(num_data) ') has no non-NaN picks.'])
+        pk                  = [];
         continue
     end
     pk.layer                = pk.layer(pk.ind_match); % only keep layers relevant to this chunk
@@ -172,13 +190,14 @@ for ii = 1:num_data
     pk.layer                = orderfields(pk.layer);
     
     % save broken-out pk structure for this frame
-    switch frame_or_pk
-        case 'frame'
-            save([dir_data file_data{ii}], '-append', 'pk')
-            disp(['Interpolated picks to ' file_data{ii}(1:(end - 4)) ' and saved to ' dir_data'.'])
-        case 'pk'
-            save([dir_pk_orig file_data{ii}(1:(end - 4)) '_pk'], 'pk')
-            disp(['Interpolated picks to ' file_data{ii}(1:(end - 4)) ' and saved to ' dir_pk_orig '.'])
+    if do_save
+        switch frame_or_pk
+            case 'frame'
+                save([dir_data file_data{ii}], '-append', '-v7.3', 'pk')
+                disp(['Interpolated picks to ' file_data{ii}(1:(end - 4)) ' and saved to ' dir_pk_orig '.'])
+            case 'pk'
+                save([dir_pk_orig file_data{ii}(1:(end - 4)) '_pk'], '-v7.3', 'pk')
+                disp(['Interpolated picks to ' file_data{ii}(1:(end - 4)) ' and saved to ' dir_data '.'])
+        end
     end
-    
 end
