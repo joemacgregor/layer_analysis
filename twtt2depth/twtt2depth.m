@@ -5,7 +5,7 @@ function [depth, firn_corr, depth_lin, refract_gain, raypath] ...
 % [DEPTH,FIRN_CORR,DEPTH_LIN,REFRACT_GAIN,RAYPATH] = TWTT2DEPTH(TWTT,DEPTH_DENSITY,THICK_LAYER,DENSITY,DENSITY_ICE,PERMITT_ICE,ANTENNA_SEPN,ANTENNA_HEIGHT,DO_TRIGGER)
 % converts two-way traveltime (aka "fast time") (TWTT; s) to depth (DEPTH;
 % m) given a depth profile of firn/ice density. DEPTH_DENSITY (m) is the
-% depth of the intervals (not midpoints) between density measurements or or
+% depth of the intervals (not midpoints) between density measurements or a
 % model, THICK_DENSITY (m) is the thickness of those intervals and DENSITY
 % is their density (g/cm^3). DENSITY_ICE is the pure ice density (e.g.,
 % 0.917 g/cm^3) and PERMITT_ICE is the real part of the complex relative
@@ -40,7 +40,7 @@ function [depth, firn_corr, depth_lin, refract_gain, raypath] ...
 % See also: LOOYENGA, R_ANGLE_TEST
 % 
 % Joe MacGregor (UTIG, joemac@ig.utexas.edu)
-% Last updated: 08/05/14
+% Last updated: 07/07/15
 
 if ~exist('looyenga.m', 'file')
     error('twtt2depth:looyenga', 'Necessary function LOOYENGA is not available within this user''s path.')
@@ -86,7 +86,7 @@ if (nargout > 5)
 end
 
 speed_vacuum                = 299792458; % speed of light in the vacuum in m/s, c
-ind_refract                 = sqrt(looyenga((density ./ density_ice), permitt_ice(ones(length(density))), ones(length(density), 1))); % index of refraction (sqrt of permittivity) in each layer
+ind_refract                 = sqrt(looyenga((density ./ density_ice), permitt_ice(ones(length(density), 1)), ones(length(density), 1))); % index of refraction (sqrt of permittivity) in each layer
 
 % account for "air time" if antenna height is non-zero
 if antenna_height 
