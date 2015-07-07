@@ -17,14 +17,14 @@ plotting                    = false;
 switch radar_type
     case 'accum'
         load mat/xy_all_accum name_trans name_year num_year num_trans x y
-        load mat/merge_all_accum ind_fence x_pk y_pk
+        load mat/merge_all_accum num_subtrans x_pk y_pk
     case 'deep'
         load mat/xy_all name_trans name_year num_year num_trans x y
-        load mat/merge_all ind_fence x_pk y_pk
+        load mat/merge_all num_subtrans x_pk y_pk
 end
 load mat/gimp_proj gimp_proj
 
-wgs84                       = wgs84Ellipsoid;
+letters                     = 'a':'z';
 
 %% concatenate x/y positions for each campaign
 
@@ -75,7 +75,10 @@ if do_core
             end
             
             % core intersections for merged picks files
-            for kk = find(ind_fence{ii}{jj})
+            for kk = 1:num_subtrans{ii}(jj)
+                if isempty(x_pk{ii}{jj}{kk})
+                    continue
+                end
                 [lat_merge_curr, lon_merge_curr] ...
                             = projinv(gimp_proj, (1e3 .* x_pk{ii}{jj}{kk}), (1e3 .* y_pk{ii}{jj}{kk}));
                 for ll = 1:num_core
@@ -84,7 +87,11 @@ if do_core
                     if (tmp1 < rad_threshold)
                         int_core_merge ...
                             = [int_core_merge; ii jj kk ll tmp2]; %#ok<AGROW>
-                        disp(['...intersects within ' sprintf('%1.2f', tmp1) ' km of ' name_core{ll} '...'])
+                        if (num_subtrans{ii}(jj) == 1)
+                            disp(['...merge file also intersects within ' sprintf('%1.2f', tmp1) ' km of ' name_core{ll} '...'])                            
+                        else
+                            disp([letters(kk) ' merge file also intersects within ' sprintf('%1.2f', tmp1) ' km of ' name_core{ll} '...'])
+                        end
                     end
                 end
             end
