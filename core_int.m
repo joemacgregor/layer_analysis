@@ -4,14 +4,14 @@
 %   deep ice-core sites and records this position if so.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 02/16/15
+% Last updated: 07/07/15
 
 clear
 
 radar_type                  = 'deep';
 
 do_core                     = true;
-do_save                     = false;
+do_save                     = true;
 plotting                    = false;
 
 switch radar_type
@@ -34,10 +34,10 @@ if do_core
     
     rad_threshold           = 3; % km
     
-    name_core               = {'Camp Century' 'DYE-3' 'GISP2' 'GRIP' 'NEEM' 'NorthGRIP'};
-    name_core_short         = {'century' 'dye3' 'gisp2' 'grip' 'neem' 'ngrip'};
-    lat_core                = [77.18 65.18 72.6 72.58  77.45  75.10];
-    lon_core                = [-61.13 -43.82 -38.5 -37.64 -51.06 -42.32];
+    name_core               = {'Camp Century' 'DYE-3' 'EGRIP' 'GISP2' 'GRIP' 'NEEM' 'NorthGRIP'};
+    name_core_short         = {'century' 'dye3' 'egrip' 'gisp2' 'grip' 'neem' 'ngrip'};
+    lat_core                = [77.18 65.18 75.63 72.6 72.58  77.45  75.10];
+    lon_core                = [-61.13 -43.82 -35.99 -38.5 -37.64 -51.06 -42.32];
     num_core                = length(name_core);
     
     [x_core, y_core]        = projfwd(gimp_proj, lat_core, lon_core);
@@ -62,6 +62,7 @@ if do_core
             [lat_curr, lon_curr] ...
                             = projinv(gimp_proj, (1e3 .* x{ii}{jj}), (1e3 .* y{ii}{jj}));
             
+            % core intersections based on x/y for raw data frames
             for kk = 1:num_core
                 [tmp1, tmp2]= min(1e-3 .* distance([lat_core(kk(ones(length(x{ii}{jj}), 1)))' lon_core(kk(ones(length(x{ii}{jj}), 1)))'], [lat_curr' lon_curr'], wgs84Ellipsoid));
                 if (tmp1 < rad_threshold)
@@ -73,7 +74,8 @@ if do_core
                 end
             end
             
-            for kk = 1:length(ind_fence{ii}{jj})
+            % core intersections for merged picks files
+            for kk = find(ind_fence{ii}{jj})
                 [lat_merge_curr, lon_merge_curr] ...
                             = projinv(gimp_proj, (1e3 .* x_pk{ii}{jj}{kk}), (1e3 .* y_pk{ii}{jj}{kk}));
                 for ll = 1:num_core
