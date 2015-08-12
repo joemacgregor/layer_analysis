@@ -12,12 +12,12 @@ function age              = shallow_strain(shallow_model, depth)
 %   and meters (m) for DEPTH.
 %
 % Joe MacGregor (UTIG), Mark Fahnestock (UAF)
-% Last updated: 10/17/13
+% Last updated: 08/11/15
 
 if (nargin ~= 2)
     error('shallow_strain:nargin', ['Number of arguments (' num2str(nargin) ') is not equal to 2.'])
 end
-if (~isnumeric(shallow_model) || (numel(shallow_model) ~= 2))
+if (~isvector(shallow_model) || ~isnumeric(shallow_model) || (length(shallow_model) ~= 2))
     error('shallow_strain:model', 'SHALLOW_MODEL is not a two-element numeric vector.')
 end
 if ~isnumeric(depth)

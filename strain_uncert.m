@@ -1,7 +1,7 @@
-function varargout          = strain_uncert(frac_test, conf_bound, model, thick, depth, age, age_uncert, model_ref, res_ref)
+function varargout          = strain_uncert(frac_test, conf_bound, model, thick, depth, age, age_uncert, model_ref, res_ref, lat_spread_rate)
 % STRAIN_UNCERT Calculate parameter confidence bounds for a strain-rate model.
 % 
-% [PARAM1,PARAM2,...] = STRAIN_UNCERT(FRAC_TEST,CONF_BOUND,MODEL,THICK,DEPTH,AGE,AGE_UNCERT,MODEL_REF,RES_REF)
+% [PARAM1,PARAM2,...] = STRAIN_UNCERT(FRAC_TEST,CONF_BOUND,MODEL,THICK,DEPTH,AGE,AGE_UNCERT,MODEL_REF,RES_REF,LAT_SPREAD_RATE)
 % calculates the confidence bounds for 1D ice-flow model parameters.
 % FRAC_TEST is the vector of fractions of the best-fit (i.e., reference)
 % model parameters about which to test, CONF_BOUND is the scalar desired
@@ -11,18 +11,19 @@ function varargout          = strain_uncert(frac_test, conf_bound, model, thick,
 % column vector of layer ages (a), AGE_UNCERT is the column vector of layer
 % age uncertainties (a), MODEL_REF is the vector of best-fit model
 % parameters, RES_REF is the scalar chi-squared residual of the best-fit
-% model.
+% model. If MODEL='dj_lat', the lateral spreading rate LAT_SPREAD_RATE must
+% also be provided.
 % 
 % STRAIN_UNCERT is called by STRAIN_LAYERS when DO_UNCERT=TRUE.
 % 
-% See also DJ_FIT, DJ_MELT_FIT, NYE_FIT, NYE_MELT_FIT, SHALLOW_STRAIN_FIT
-% and STRAIN_LAYERS.
+% See also DJ_FIT, DJ_LAT_FIT, DJ_MELT_FIT, NYE_FIT, NYE_MELT_FIT,
+% SHALLOW_STRAIN_FIT and STRAIN_LAYERS.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 10/08/14
+% Last updated: 08/11/15
 
-if (nargin ~= 9)
-    error('strain_uncert:nargin', 'Incorrect number of input arguments (should be 9).')
+if ~any(nargin == [9 10])
+    error('strain_uncert:nargin', 'Incorrect number of input arguments (should be 9 or 10).')
 end
 if ~exist('delta_chisq', 'file')
     error('strain_uncert:delta_chisq', 'Function DELTA_CHISQ is not available within this user''s path.')
@@ -39,8 +40,8 @@ end
 if ~ischar(model)
     error('strain_uncert:modelchar', 'MODEL is not a string.')
 end
-if ~any(strcmp(model, {'dj' 'dj_melt' 'nye' 'nye_melt' 'shallow_strain'}))
-    error('strain_uncert:model', 'MODEL is not one of the recognized strain-rate models: ''dj'', ''dj_melt'', ''nye'', ''nye_melt'' or ''shallow_strain'').')
+if ~any(strcmp(model, {'dj' 'dj_lat' 'dj_melt' 'nye' 'nye_melt' 'shallow_strain'}))
+    error('strain_uncert:model', 'MODEL is not one of the recognized strain-rate models: ''dj'', ''dj_lat'', ''dj_melt'', ''nye'', ''nye_melt'' or ''shallow_strain'').')
 end
 if (~isnumeric(thick) || ~isscalar(thick))
     error('strain_uncert:thick', 'THICK is not a numeric scalar.')
@@ -61,7 +62,7 @@ if (~isnumeric(model_ref) || ~isvector(model_ref))
     error('strain_uncert:model_ref', 'MODEL_REF is not a numeric vector.')
 end
 if (length(model_ref) ~= nargout)
-    error('strain_uncert:model_refnargout', 'Number of elements in MODEL_REF does match number of parameter confidence ranges to be calculated.')
+    error('strain_uncert:model_refnargout', 'Number of elements in MODEL_REF does not match number of parameter confidence ranges to be calculated.')
 end
 if (~isnumeric(res_ref) || ~isscalar(res_ref))
     error('strain_uncert:res_ref', 'RES_REF is not a numeric scalar.')
@@ -69,7 +70,12 @@ end
 if (res_ref <= 0)
     error('strain_uncert:res_refpos', 'RES_REF is not positive.')
 end
-
+if (strcmp(model, 'dj_lat') && (nargin ~= 10))
+    error('strain_uncert:djlatnargin', 'MODEL=''dj_lat'' but LAT_SPREAD_RATE is not an argument.')
+end
+if (strcmp(model, 'dj_lat') && (~isscalar(lat_spread_rate) || ~isnumeric(lat_spread_rate)))
+    error('strain_uncert:djlatnargin', 'LAT_SPREAD_RATE is not a numeric scalar.')
+end
 num_param                   = length(model_ref);
 model_bound                 = NaN(2, num_param);
 num_test                    = length(frac_test);
@@ -92,10 +98,13 @@ for ii = 1:num_param
         res                 = NaN(1, 100);
         for kk = find(~isnan(param_test)) % loop through current parameter space
             model_curr(ii)  = param_test(kk); % adjust current strain-rate model
-            if strcmp(model, 'shallow_strain')
-                res(kk)     = eval([model '_fit(model_curr, depth, age, age_uncert)']); % chi-squared of current model
-            else
-                res(kk)     = eval([model '_fit(model_curr, thick, depth, age, age_uncert)']);
+            switch model
+                case 'dj_lat'
+                    res(kk) = eval([model '_fit(model_curr, thick, depth, age, age_uncert, lat_spread_rate)']);
+                case 'shallow_strain'
+                    res(kk) = eval([model '_fit(model_curr, depth, age, age_uncert)']); % chi-squared of current model
+                otherwise
+                    res(kk) = eval([model '_fit(model_curr, thick, depth, age, age_uncert)']);
             end
         end
         

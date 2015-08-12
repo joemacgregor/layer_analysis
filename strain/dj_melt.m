@@ -30,19 +30,19 @@ function age                = dj_melt(dj_melt_model, thick, depth)
 %   37, 207-212.
 %
 % Joe MacGregor (UTIG), Mark Fahnestock (UAF)
-% Last updated: 10/17/13
+% Last updated: 08/11/15
 
 if (nargin ~= 3)
     error('dj_melt:nargin', ['Number of arguments (' num2str(nargin) ') is not equal to 3.'])
 end
-if ((length(dj_melt_model) ~= 4) || ~isnumeric(dj_melt_model))
-    error('dj_melt:dj_model', 'DJ_MELT_MODEL is not a four-element vector.')
+if (~isvector(dj_melt_model) || ~isnumeric(dj_melt_model) || (length(dj_melt_model) ~= 4))
+    error('dj_melt:dj_melt_model', 'DJ_MELT_MODEL is not a four-element numeric vector.')
 end
-if ((length(thick) ~= 1) || ~isnumeric(thick))
-    error('dj_melt:thick', 'THICK is not a scalar.')
+if (~isscalar(thick) || ~isnumeric(thick))
+    error('dj_melt:thick', 'THICK is not a numeric scalar.')
 end
 if ~isnumeric(depth)
-    error('dj_melt:depth', 'DEPTH is not numeric.') 
+    error('dj_melt:depth', 'DEPTH is not numeric.')
 end
 
 k                           = (dj_melt_model(1) - dj_melt_model(3)) / (((dj_melt_model(2) * (dj_melt_model(4) - 1)) / 2) + thick); % factor rr in Dahl-Jensen et al., 2003, Equation 4, (bdot-mdot)/(((h(s-1))/2)+H)
@@ -65,5 +65,5 @@ elseif (quad < 0)
                             = age_h + ((2 / quad_root) .* (atanh((((2 * a) * dj_melt_model(2)) + b) ./ quad_root) - atanh((((2 * a) .* (thick - depth(depth > (thick - dj_melt_model(2))))) + b) ./ quad_root)));    
 elseif (quad == 0)
     age(depth > (thick - dj_melt_model(2))) ...
-                            = (2 / (((2 * a) * dj_melt_model(2)) + b)) - (2 / (((2 * a) * (thick - depth(depth > (thick - dj_melt_model(2))))) + b));
+                            = age_h + ((2 / (((2 * a) * dj_melt_model(2)) + b)) - (2 / (((2 * a) * (thick - depth(depth > (thick - dj_melt_model(2))))) + b)));
 end

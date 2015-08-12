@@ -23,15 +23,15 @@ function age                = dj(dj_model, thick, depth)
 %   2338-2342.
 %
 % Joe MacGregor (UTIG), Mark Fahnestock (UAF)
-% Last updated: 10/17/13
+% Last updated: 08/11/15
 
 if (nargin ~= 3)
     error('dj:nargin', ['Number of arguments (' num2str(nargin) ') is not equal to 3.'])
 end
-if ((length(dj_model) ~= 2) || ~isnumeric(dj_model))
-    error('dj:dj_model', 'DJ_MODEL is not a two-element vector.')
+if (~isvector(dj_model) || ~isnumeric(dj_model) || (length(dj_model) ~= 2))
+    error('dj:dj_model', 'DJ_MODEL is not a two-element numeric vector.')
 end
-if ((length(thick) ~= 1) || ~isnumeric(thick))
+if (~isscalar(thick) || ~isnumeric(thick))
     error('dj:thick', 'THICK is not a scalar.')
 end
 if ~isnumeric(depth)

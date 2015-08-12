@@ -32,7 +32,7 @@ function chisq              = dj_melt_fit(dj_melt_model, thick, depth, age, age_
 %   37, 207-212.
 %
 % Joe MacGregor (UTIG), Mark Fahnestock (UAF)
-% Last updated: 10/30/13
+% Last updated: 08/10/15
 
 if (nargin ~= 5)
     error('dj_melt_fit:nargin', ['Number of arguments (' num2str(nargin) ') is not equal to 5.'])
@@ -79,6 +79,6 @@ elseif (quad < 0)
                             = age_h + ((2 / quad_root) .* (atanh((((2 * a) * dj_melt_model(2)) + b) ./ quad_root) - atanh((((2 * a) .* (thick - depth(depth > (thick - dj_melt_model(2))))) + b) ./ quad_root)));    
 elseif (quad == 0)
     age_dj_melt(depth > (thick - dj_melt_model(2))) ...
-                            = (2 / (((2 * a) * dj_melt_model(2)) + b)) - (2 / (((2 * a) * (thick - depth(depth > (thick - dj_melt_model(2))))) + b));
+                            = age_h + ((2 / (((2 * a) * dj_melt_model(2)) + b)) - (2 / (((2 * a) * (thick - depth(depth > (thick - dj_melt_model(2))))) + b)));
 end
 chisq                       = sum(((age - age_dj_melt) ./ age_uncert) .^ 2);

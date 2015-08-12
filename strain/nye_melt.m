@@ -22,15 +22,15 @@ function age                = nye_melt(nye_melt_model, thick, depth)
 %   2338-2342.
 %
 % Joe MacGregor (UTIG), Mark Fahnestock (UAF)
-% Last updated: 10/17/13
+% Last updated: 08/11/15
 
 if (nargin ~= 3)
     error('nye_melt:nargin', ['Number of arguments (' num2str(nargin) ') is not equal to 3.'])
 end
-if ((length(nye_melt_model) ~= 2) || ~isnumeric(nye_melt_model))
-    error('nye_melt:nyemeltmodel', 'NYE_MELT_MODEL is not a two-element vector.')
+if (~isvector(nye_melt_model) || ~isnumeric(nye_melt_model) || (length(nye_melt_model) ~= 2))
+    error('nye_melt:nyemeltmodel', 'NYE_MELT_MODEL is not a numeric two-element vector.')
 end
-if ((length(thick) ~= 1) || ~isnumeric(thick))
+if (~isscalar(thick) || ~isnumeric(thick))
     error('nye_melt:thick', 'THICK is not a scalar.')
 end
 if ~isnumeric(depth)

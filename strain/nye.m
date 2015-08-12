@@ -19,16 +19,16 @@ function age                = nye(accum, thick, depth)
 %   2338-2342.
 % 
 % Joe MacGregor (UTIG), Mark Fahnestock (UAF)
-% Last updated: 02/12/13
+% Last updated: 08/11/15
 
 if (nargin ~= 3)
     error('nye:nargin', ['Number of arguments (' num2str(nargin) ') is not equal to 3.'])
 end
-if ((length(accum) ~= 1) || ~isnumeric(accum))
+if (~isscalar(accum) || ~isnumeric(accum))
     error('nye:accum', 'ACCUM is not a scalar.')
 end
-if ((length(thick) ~= 1) || ~isnumeric(thick))
-    error('nye:thick', 'THICK is not a scalar.')
+if (~isscalar(thick) || ~isnumeric(thick))
+    error('nye:thick', 'THICK is not a numeric scalar.')
 end
 if ~isnumeric(depth)
     error('nye:depth', 'DEPTH is not numeric.')
