@@ -1,7 +1,8 @@
-function varargout          = strain_uncert(frac_test, conf_bound, model, thick, depth, age, age_uncert, model_ref, res_ref, lat_spread_rate)
-% STRAIN_UNCERT Calculate parameter confidence bounds for a strain-rate model.
+function varargout          = strain_uncert(frac_test, conf_bound, model, thick, depth, age, age_uncert, model_ref, res_ref, lon_strain_rate, lat_strain_rate)
+% STRAIN_UNCERT Calculate model-parameter confidence bounds for a strain-rate model.
 % 
-% [PARAM1,PARAM2,...] = STRAIN_UNCERT(FRAC_TEST,CONF_BOUND,MODEL,THICK,DEPTH,AGE,AGE_UNCERT,MODEL_REF,RES_REF,LAT_SPREAD_RATE)
+% [PARAM1,PARAM2,...] =
+% STRAIN_UNCERT(FRAC_TEST,CONF_BOUND,MODEL,THICK,DEPTH,AGE,AGE_UNCERT,MODEL_REF,RES_REF,LON_STRAIN_RATE,LAT_STRAIN_RATE)
 % calculates the confidence bounds for 1D ice-flow model parameters.
 % FRAC_TEST is the vector of fractions of the best-fit (i.e., reference)
 % model parameters about which to test, CONF_BOUND is the scalar desired
@@ -11,19 +12,20 @@ function varargout          = strain_uncert(frac_test, conf_bound, model, thick,
 % column vector of layer ages (a), AGE_UNCERT is the column vector of layer
 % age uncertainties (a), MODEL_REF is the vector of best-fit model
 % parameters, RES_REF is the scalar chi-squared residual of the best-fit
-% model. If MODEL='dj_lat', the lateral spreading rate LAT_SPREAD_RATE must
+% model. If MODEL='dj_lat' or 'dj_surf', the longitudinal and lateral
+% strain rates (LON_STRAIN_RATE and LAT_STRAIN_RATE, respectively) must
 % also be provided.
 % 
 % STRAIN_UNCERT is called by STRAIN_LAYERS when DO_UNCERT=TRUE.
 % 
-% See also DJ_FIT, DJ_LAT_FIT, DJ_MELT_FIT, NYE_FIT, NYE_MELT_FIT,
-% SHALLOW_STRAIN_FIT and STRAIN_LAYERS.
+% See also DJ_FIT, DJ_LAT_FIT, DJ_MELT_FIT, DJ_SURF_FIT,NYE_FIT,
+% NYE_MELT_FIT, SHALLOW_STRAIN_FIT and STRAIN_LAYERS.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 08/11/15
+% Last updated: 08/19/15
 
-if ~any(nargin == [9 10])
-    error('strain_uncert:nargin', 'Incorrect number of input arguments (should be 9 or 10).')
+if ~any(nargin == [9 11])
+    error('strain_uncert:nargin', 'Incorrect number of input arguments (should be 9 or 11).')
 end
 if ~exist('delta_chisq', 'file')
     error('strain_uncert:delta_chisq', 'Function DELTA_CHISQ is not available within this user''s path.')
@@ -40,8 +42,8 @@ end
 if ~ischar(model)
     error('strain_uncert:modelchar', 'MODEL is not a string.')
 end
-if ~any(strcmp(model, {'dj' 'dj_lat' 'dj_melt' 'nye' 'nye_melt' 'shallow_strain'}))
-    error('strain_uncert:model', 'MODEL is not one of the recognized strain-rate models: ''dj'', ''dj_lat'', ''dj_melt'', ''nye'', ''nye_melt'' or ''shallow_strain'').')
+if ~any(strcmp(model, {'dj' 'dj_lat' 'dj_melt' 'dj_surf', 'nye' 'nye_melt' 'shallow_strain'}))
+    error('strain_uncert:model', 'MODEL is not one of the recognized strain-rate models: ''dj'', ''dj_lat'', ''dj_melt'', ''dj_surf'', ''nye'', ''nye_melt'' or ''shallow_strain'').')
 end
 if (~isnumeric(thick) || ~isscalar(thick))
     error('strain_uncert:thick', 'THICK is not a numeric scalar.')
@@ -70,11 +72,14 @@ end
 if (res_ref <= 0)
     error('strain_uncert:res_refpos', 'RES_REF is not positive.')
 end
-if (strcmp(model, 'dj_lat') && (nargin ~= 10))
-    error('strain_uncert:djlatnargin', 'MODEL=''dj_lat'' but LAT_SPREAD_RATE is not an argument.')
+if (any(strcmp(model, {'dj_lat' 'dj_surf'})) && (nargin ~= 11))
+    error('strain_uncert:djlatnargin', 'MODEL=''dj_lat/surf'' but LON_SPREAD_RATE and LAT_SPREAD_RATE are not arguments.')
 end
-if (strcmp(model, 'dj_lat') && (~isscalar(lat_spread_rate) || ~isnumeric(lat_spread_rate)))
-    error('strain_uncert:djlatnargin', 'LAT_SPREAD_RATE is not a numeric scalar.')
+if (any(strcmp(model, {'dj_lat' 'dj_surf'})) && (~isscalar(lon_strain_rate) || ~isnumeric(lon_strain_rate)))
+    error('strain_uncert:djlonnargin', 'LON_STRAIN_RATE is not a numeric scalar.')
+end
+if (any(strcmp(model, {'dj_lat' 'dj_surf'})) && (~isscalar(lat_strain_rate) || ~isnumeric(lat_strain_rate)))
+    error('strain_uncert:djlatnargin', 'LAT_STRAIN_RATE is not a numeric scalar.')
 end
 num_param                   = length(model_ref);
 model_bound                 = NaN(2, num_param);
@@ -99,8 +104,8 @@ for ii = 1:num_param
         for kk = find(~isnan(param_test)) % loop through current parameter space
             model_curr(ii)  = param_test(kk); % adjust current strain-rate model
             switch model
-                case 'dj_lat'
-                    res(kk) = eval([model '_fit(model_curr, thick, depth, age, age_uncert, lat_spread_rate)']);
+                case {'dj_lat' 'dj_surf'}
+                    res(kk) = eval([model '_fit(model_curr, thick, depth, age, age_uncert, lon_strain_rate, lat_strain_rate)']);
                 case 'shallow_strain'
                     res(kk) = eval([model '_fit(model_curr, depth, age, age_uncert)']); % chi-squared of current model
                 otherwise

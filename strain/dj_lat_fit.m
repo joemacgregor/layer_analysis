@@ -1,27 +1,28 @@
-function chisq              = dj_lat_fit(dj_lat_model, thick, depth, age, age_uncert, lat_spread_rate)
-% DJ_LAT_FIT Residual between radar-observed and Dansgaard-Johnsen lateral-spreading-corrected depth-age scales.
+function chisq              = dj_lat_fit(dj_lat_model, thick, depth, age, age_uncert, lon_strain_rate, lat_strain_rate)
+% DJ_LAT_FIT Residual between radar-observed and Dansgaard-Johnsen lateral-strain-corrected depth-age scales.
 %   
-%   CHISQ = DJ_LAT_FIT(DJ_LAT_MODEL,THICK,DEPTH,AGE,AGE_UNCERT,LAT_SPREAD_RATE)
+%   CHISQ = DJ_LAT_FIT(DJ_LAT_MODEL,THICK,DEPTH,AGE,AGE_UNCERT,LON_STRAIN_RATE,LAT_STRAIN_RATE)
 %   calculates the Chi-squared residual CHISQ between the ages AGE (and age
 %   uncertainties AGE_UNCERT) of radar-observed layers at depths DEPTH with
 %   those ages calculated by a one-dimensional Dansgaard-Johnsen vertical
-%   strain-rate model that is corrected for the lateral spreading rate
-%   LAT_SPREAD_RATE. This model requires a scalar ice thickness THICK and a
-%   two-element vector DJ_MODEL. The first element of DJ_LAT_MODEL is the
-%   steady-state accumulation rate and the second element is the thickness
-%   of the basal shear layer, aka "little h" or the height of the shear
-%   layer above the bed.
+%   strain-rate model that is corrected for longitudinal and lateral
+%   strain rates (LON_STRAIN_RATE and LAT_STRAIN_RATE, respectively).
+%   This model requires a scalar ice thickness THICK and a two-element
+%   vector DJ_MODEL. The first element of DJ_LAT_MODEL is the steady-state
+%   accumulation rate and the second element is the thickness of the basal
+%   shear layer, aka "little h" or the height of the shear layer above the
+%   bed.
 %   
 %   Values must have self-consistent units, e.g., ice-equivalent meters per
 %   year (m/a) for accumulation rate, meters (m) for THICK, DEPTH,
 %   shear-layer thickness, years (a) for AGE and AGE_UNCERT and inverse
-%   years (1/a) for lateral spreading rate.
+%   years (1/a) for horizontal strain rates.
 %   
 % Joe MacGregor (UTIG)
-% Last updated: 08/11/15
+% Last updated: 08/20/15
 
-if (nargin ~= 6)
-    error('dj_lat_fit:nargin', ['Number of arguments (' num2str(nargin) ') is not equal to 6.'])
+if (nargin ~= 7)
+    error('dj_lat_fit:nargin', ['Number of arguments (' num2str(nargin) ') is not equal to 7.'])
 end
 if (~isvector(dj_lat_model) || ~isnumeric(dj_lat_model) || (numel(dj_lat_model) ~= 2))
     error('dj_lat_fit:dj_lat_model', 'DJ_LAT_MODEL is not a numeric two-element vector.')
@@ -41,26 +42,23 @@ end
 if ~isequal(size(depth), size(age), size(age_uncert))
     error('dj_lat_fit:depthagematch', 'DEPTH/AGE/AGE_UNCERT sizes are not equal.')
 end
-if (~isscalar(lat_spread_rate) || ~isnumeric(lat_spread_rate))
-    error('dj_lat_fit:latspreadrate', 'LAT_SPREAD_RATE is not a numeric scalar.')
+if (~isscalar(lon_strain_rate) || ~isnumeric(lon_strain_rate))
+    error('dj_lat_fit:lonstrainrate', 'LON_STRAIN_RATE is not a numeric scalar.')
+end
+if (~isscalar(lat_strain_rate) || ~isnumeric(lat_strain_rate))
+    error('dj_lat_fit:latstrainrate', 'LAT_STRAIN_RATE is not a numeric scalar.')
 end
 if (nargout > 1)
     error('dj_lat_fit:nargout', ['Number of outputs (' num2str(nargout) ') is greater than 1.'])
 end
 
-k                           = (2 * (dj_lat_model(1) - (lat_spread_rate * thick))) / ((2 * thick) - dj_lat_model(2));
-depth_0                     = (k * dj_lat_model(2)) / (2 * (k + lat_spread_rate));
+alpha                       = lat_strain_rate / lon_strain_rate;
+k                           = (1 + alpha) * ((2 * (dj_lat_model(1))) / ((2 * thick) - dj_lat_model(2)));
+depth_0                     = (dj_lat_model(2) / 2) / (1 + alpha);
 age_h                       = ((depth_0 - thick) / dj_lat_model(1)) * log((dj_lat_model(2) - depth_0) / (thick - depth_0));
-a                           = -k / (2 * dj_lat_model(2));
-b                           = -lat_spread_rate;
 age_dj_lat                  = zeros(length(depth), 1);
 age_dj_lat(depth <= (thick - dj_lat_model(2))) ...
                             = ((depth_0 - thick) / dj_lat_model(1)) .* log(((thick - depth(depth <= (thick - dj_lat_model(2)))) - depth_0) ./ (thick - depth_0));
-if (b == 0)
-    age_dj_lat(depth > (thick - dj_lat_model(2))) ...
-                            = age_h + ((1 / a) .* ((1 / dj_lat_model(2)) - (1 ./ (thick - depth(depth > (thick - dj_lat_model(2)))))));   
-else
-    age_dj_lat(depth > (thick - dj_lat_model(2))) ...
-                            = age_h + ((2 / b) .* (atanh((((2 * a) .* dj_lat_model(2)) + b) / b) - atanh((((2 * a) .* (thick - depth(depth > (thick - dj_lat_model(2))))) + b) ./ b)));
-end
+age_dj_lat(depth > (thick - dj_lat_model(2))) ...
+                            = age_h + ((2 / k) .* ((dj_lat_model(2) ./ (thick - depth(depth > (thick - dj_lat_model(2))))) - 1));
 chisq                       = sum(((age - age_dj_lat) ./ age_uncert) .^ 2);
