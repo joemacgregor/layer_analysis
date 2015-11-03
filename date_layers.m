@@ -1,12 +1,12 @@
 % DATE_LAYERS Date layers using ice-core depth/age scales and 1D/2D interpolation/extrapolation or quasi-Nye dating of overlapping dated layers.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 03/24/15
+% Last updated: 11/03/15
 
 clear
 
 % switches
-radar_type                  = 'accum';
+radar_type                  = 'deep';
 
 switch radar_type
     case 'accum'
@@ -28,16 +28,16 @@ switch radar_type
         do_interp           = true;
         interp_type         = 'quasi Nye';
         do_save             = true;
-        do_grd1             = true;
-        do_grd2             = true;
-        do_nye_norm         = true;
+        do_grd1             = false;
+        do_grd2             = false;
+        do_nye_norm         = false;
 end
 
 % variables of interest
 switch radar_type
     case 'accum'
         depth_uncert        = 5; % depth uncertainty representing unknown firn correction, m
-        age_uncert_rel_max  = 0.1; % maximum relative age uncertainty
+        age_uncert_rel_max  = 0.25; % maximum relative age uncertainty
         dist_int_max        = 0.25; % km, +/- range to extract core-intersecting layer depths
         thick_diff_max      = 0.05; % fraction of ice thickness within which overlapping layer must lie
         layer_diff_max      = 1; % fraction of layer thickness within which overlapping layer must lie
@@ -52,9 +52,9 @@ switch radar_type
         depth_shallow_max   = 0.05; % maximum fraction of ice thickness to attempt shallow fitting
         num_date_loop_max   = 10; % maximum number of dating loops
         age_max             = 1e4; % maximum permitted reflector age
-        year_ord            = [1 2 3]; % order in which to analyze years/campaigns based on their overall data quality
-        num_gauss           = ones(1, 3); % number of Gaussians to use to fit Nye differences of normalized ages
-        core_avail          = true(1, 6); % cores to include in dating, following order in core names
+        year_ord            = [1 2 3 4]; % order in which to analyze years/campaigns based on their overall data quality
+        num_gauss           = ones(1, 4); % number of Gaussians to use to fit Nye differences of normalized ages
+        core_avail          = [true(1, 2) false true(1, 4)]; % cores to include in dating, following order in core names
     case 'deep'
         depth_uncert        = 10; % depth uncertainty representing unknown firn correction, m
         age_uncert_rel_max  = 0.25; % maximum relative age uncertainty
@@ -72,9 +72,9 @@ switch radar_type
         depth_shallow_max   = 0.2; % maximum fraction of ice thickness to attempt shallow fitting
         num_date_loop_max   = 10; % maximum number of dating loops
         age_max             = 1.5e5; % maximum permitted reflector age, a
-        year_ord            = [17 19 20 6 7 8 4 9 5 2 3 12 1 13 15 16 18 11 10 14]; % order in which to analyze years/campaigns based on their overall data quality
+        year_ord            = [17 19 21 20 6 7 8 4 9 5 2 3 12 1 13 15 16 18 11 10 14]; % order in which to analyze years/campaigns based on their overall data quality
         num_gauss           = [ones(1, 15) (2 .* ones(1, 8)) 1]; % number of Gaussians to use to fit Nye differences of normalized ages
-        core_avail          = true(1, 6); % cores to include in dating, following order in core names
+        core_avail          = [true(1, 2) false true(1, 4)]; % cores to include in dating, following order in core names
 end
 
 if strcmp(interp_type, 'quasi Nye')
@@ -89,13 +89,13 @@ switch radar_type
     case 'accum'
         load mat/xy_all_accum num_year num_trans name_year name_trans
         load mat/core_int_accum int_core_merge num_core name_core_short
-        load mat/id_layer_master_accum_stable id_layer_master_mat
+        load mat/ind_layer_match_accum_stable ind_layer_match
         load mat/merge_all_accum depth_smooth dist ind_decim ind_decim_mid num_decim num_layer num_subtrans num_trace_tot thick thick_decim x_pk y_pk
         load mat/range_resolution_accum range_resolution
     case 'deep'
         load mat/xy_all num_year num_trans name_year name_trans
         load mat/core_int int_core_merge num_core name_core_short
-        load mat/id_layer_master_stable id_layer_master_mat
+        load mat/ind_layer_match_stable ind_layer_match
         load mat/merge_all depth_smooth dist ind_decim ind_decim_mid num_decim num_layer num_subtrans num_trace_tot thick thick_decim x_pk y_pk
         load mat/range_resolution range_resolution
 end
@@ -134,7 +134,7 @@ end
 
 % load core depth-age scales
 core                        = cell(1, num_core);
-for ii = 1:num_core
+for ii = find(core_avail)
     core{ii}                = load(['mat/depth_age/' name_core_short{ii} '_depth_age']);
     if isnan(core{ii}.age(end))
         [core{ii}.age, core{ii}.age_uncert, core{ii}.depth] ...
@@ -222,15 +222,15 @@ if do_date
     end
     
     % clean up matching list by putting earlier year first
-    for ii = 1:size(id_layer_master_mat, 1)
-        if ((id_layer_master_mat(ii, 1) > id_layer_master_mat(ii, 5)) || ((id_layer_master_mat(ii, 1) == id_layer_master_mat(ii, 5)) && (id_layer_master_mat(ii, 2) > id_layer_master_mat(ii, 6))) || ...
-           ((id_layer_master_mat(ii, 1) == id_layer_master_mat(ii, 5)) && (id_layer_master_mat(ii, 2) == id_layer_master_mat(ii, 6)) && (id_layer_master_mat(ii, 3) > id_layer_master_mat(ii, 7))) || ...
-           ((id_layer_master_mat(ii, 1) == id_layer_master_mat(ii, 5)) && (id_layer_master_mat(ii, 2) == id_layer_master_mat(ii, 6)) && (id_layer_master_mat(ii, 3) == id_layer_master_mat(ii, 7)) && (id_layer_master_mat(ii, 4) > id_layer_master_mat(ii, 8))))
-            id_layer_master_mat(ii, :) ...
-                            = id_layer_master_mat(ii, [5:8 1:4]);
+    for ii = 1:size(ind_layer_match, 1)
+        if ((ind_layer_match(ii, 1) > ind_layer_match(ii, 5)) || ((ind_layer_match(ii, 1) == ind_layer_match(ii, 5)) && (ind_layer_match(ii, 2) > ind_layer_match(ii, 6))) || ...
+           ((ind_layer_match(ii, 1) == ind_layer_match(ii, 5)) && (ind_layer_match(ii, 2) == ind_layer_match(ii, 6)) && (ind_layer_match(ii, 3) > ind_layer_match(ii, 7))) || ...
+           ((ind_layer_match(ii, 1) == ind_layer_match(ii, 5)) && (ind_layer_match(ii, 2) == ind_layer_match(ii, 6)) && (ind_layer_match(ii, 3) == ind_layer_match(ii, 7)) && (ind_layer_match(ii, 4) > ind_layer_match(ii, 8))))
+            ind_layer_match(ii, :) ...
+                            = ind_layer_match(ii, [5:8 1:4]);
         end
     end
-    id_layer_master_mat     = unique(id_layer_master_mat, 'rows');
+    ind_layer_match         = unique(ind_layer_match, 'rows');
     
     disp('Assigning master IDs within campaigns...')
     
@@ -242,7 +242,7 @@ if do_date
     for ii = year_ord
         
         % all matches within current campaign
-        match_curr          = id_layer_master_mat(ismember(id_layer_master_mat(:, [1 5]), [ii ii], 'rows'), :);
+        match_curr          = ind_layer_match(ismember(ind_layer_match(:, [1 5]), [ii ii], 'rows'), :);
         match_curr_cell     = match_curr;
         match_curr_cell(~match_curr_cell) ...
                             = 1;
@@ -331,7 +331,7 @@ if do_date
             end
             
             % all matches for current campaign pair
-            match_curr      = id_layer_master_mat((ismember(id_layer_master_mat(:, [1 5]), [ii jj], 'rows') | ismember(id_layer_master_mat(:, [1 5]), [jj ii], 'rows')), 1:8);
+            match_curr      = ind_layer_match((ismember(ind_layer_match(:, [1 5]), [ii jj], 'rows') | ismember(ind_layer_match(:, [1 5]), [jj ii], 'rows')), 1:8);
             match_curr_cell = match_curr;
             match_curr_cell(~match_curr_cell) ...
                             = 1;
@@ -385,20 +385,6 @@ if do_date
     % trim bins
     layer_bin               = layer_bin(ind_bin_ord);
     layer_bin               = layer_bin(logical(num_bin(ind_bin_ord)));
-    num_bin                 = num_bin(ind_bin_ord);
-    num_bin                 = num_bin(logical(num_bin)); % number of total bins
-    
-    % assign master ids to matches following current scheme
-    id_layer_master_mat     = [id_layer_master_mat NaN(size(id_layer_master_mat, 1), 1)];
-    for ii = 1:size(id_layer_master_mat, 1)
-        id_curr             = id_layer_master_mat(ii, 1:8);
-        id_curr(~id_curr)   = 1;
-        id_layer_master_mat(ii, end) ...
-                            = min([age_match{id_curr(1)}{id_curr(2)}{id_curr(3)}(id_curr(4)) age_match{id_curr(5)}{id_curr(6)}{id_curr(7)}(id_curr(8))]);
-    end
-    
-    % remove matches with no master ID (i.e., retroactively not permitted matches)
-    id_layer_master_mat     = id_layer_master_mat(~isnan(id_layer_master_mat(:, end)), :);
     
     % initialize master age list
     num_master              = length(layer_bin);

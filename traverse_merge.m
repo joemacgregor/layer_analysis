@@ -1,11 +1,11 @@
 % TRAVERSE_MERGE Extract merged layer data from melt/icebridge/data/.
 % 
 % Joe MacGregor (UTIG)
-% Last updated: 03/24/15
+% Last updated: 11/02/15
 
 clear
 
-radar_type                  = 'accum';
+radar_type                  = 'deep';
 
 % load transect data
 switch radar_type
@@ -23,8 +23,8 @@ letters                     = 'a':'z';
 dist_int_decim              = 1; % decimation index distance, km
 
 % initializations
-[depth_smooth, dist, elev_air_gimp, elev_bed_gimp, elev_smooth_gimp, elev_surf_gimp, file_block, ind_decim, ind_decim_mid, ind_fence, ind_layer, ind_trace_start, int_bed, int_smooth, int_surf, lat, lon, num_decim, num_subtrans, num_layer, num_trace_tot, thick, thick_decim, time, twtt_smooth, ...
- twtt_surf, x_pk, y_pk]     = deal(cell(1, num_year));
+[depth_smooth, dist, elev_air_gimp, elev_bed_gimp, elev_smooth_gimp, elev_surf_gimp, file_block, ind_decim, ind_decim_mid, ind_trace_start, int_bed, int_smooth, int_surf, lat, lon, num_decim, num_subtrans, num_layer, num_trace_tot, thick, thick_decim, time, twtt_smooth, twtt_surf, x_pk, y_pk] ...
+                            = deal(cell(1, num_year));
 
 disp('Collecting all merged picks files...')
 
@@ -33,15 +33,13 @@ for ii = 1:num_year
     
     disp(['Campaign: ' name_year{ii} '...'])
     
-    [depth_smooth{ii}, dist{ii}, elev_air_gimp{ii}, elev_bed_gimp{ii}, elev_smooth_gimp{ii}, elev_surf_gimp{ii}, file_block{ii}, ind_decim{ii}, ind_decim_mid{ii}, ind_fence{ii}, ind_layer{ii}, ind_trace_start{ii}, int_bed{ii}, int_smooth{ii}, int_surf{ii}, lat{ii}, lon{ii}, num_decim{ii}, ...
-     num_layer{ii}, num_trace_tot{ii}, thick{ii}, thick_decim{ii}, time{ii}, twtt_smooth{ii}, twtt_surf{ii}, x_pk{ii}, y_pk{ii}] ...
+    [depth_smooth{ii}, dist{ii}, elev_air_gimp{ii}, elev_bed_gimp{ii}, elev_smooth_gimp{ii}, elev_surf_gimp{ii}, file_block{ii}, ind_decim{ii}, ind_decim_mid{ii}, ind_trace_start{ii}, int_bed{ii}, int_smooth{ii}, int_surf{ii}, lat{ii}, lon{ii}, num_decim{ii}, num_layer{ii}, num_trace_tot{ii}, ...
+     thick{ii}, thick_decim{ii}, time{ii}, twtt_smooth{ii}, twtt_surf{ii}, x_pk{ii}, y_pk{ii}] ...
                             = deal(cell(1, num_trans(ii)));
     num_subtrans{ii}        = deal(zeros(1, num_trans(ii)));
     
     for jj = 1:num_trans(ii)
-        
-        ind_fence{ii}{jj}   = logical([]);
-        
+                
         if exist([name_year{ii} '/merge/' name_trans{ii}{jj} '_pk_merge.mat'], 'file')
             
             pk              = load([name_year{ii} '/merge/' name_trans{ii}{jj} '_pk_merge.mat']); % load a transect's merge file (no a/b/c/etc, just a single file)
@@ -82,22 +80,6 @@ for ii = 1:num_year
             
             num_subtrans{ii}(jj) ...
                             = 1; % number of merge files for this transect
-            if isfield(pk, 'ind_layer') % only true if merge file has been reviewed through FENCEGUI
-                ind_layer{ii}{jj}{1} ...
-                            = pk.ind_layer;
-                if ~isempty(pk.ind_layer)
-                    ind_fence{ii}{jj} ...
-                            = true;
-                else
-                    ind_fence{ii}{jj} ...
-                            = false;
-                end
-            else
-                ind_layer{ii}{jj}{1} ...
-                            = [];
-                ind_fence{ii}{jj} ...
-                            = false;
-            end
             
         else
             
@@ -143,25 +125,9 @@ for ii = 1:num_year
                             = nanmean(thick{ii}{jj}{kk}(ind_decim{ii}{jj}{kk}(ll):ind_decim{ii}{jj}{kk}(ll + 1)));
                 end
                 
-                if isfield(pk, 'ind_layer') % only true if merge file has been reviewed through FENCEGUI
-                    ind_layer{ii}{jj}{kk} ...
-                            = pk.ind_layer;
-                    if ~isempty(pk.ind_layer)
-                        ind_fence{ii}{jj}(kk) ...
-                            = true;
-                    else
-                        ind_fence{ii}{jj}(kk) ...
-                            = false;
-                    end
-                else
-                    ind_layer{ii}{jj}{kk} ...
-                            = [];
-                    ind_fence{ii}{jj}(kk) ...
-                            = false;
-                end
             end
             num_subtrans{ii}(jj) ...
-                            = length(ind_fence{ii}{jj});
+                            = length(depth_smooth{ii}{jj});
         end
     end
 end
@@ -171,6 +137,6 @@ file_save                   = 'mat/merge_all';
 if strcmp(radar_type, 'accum')
     file_save               = [file_save '_accum'];
 end
-save(file_save, '-v7.3', 'depth_smooth', 'dist', 'elev_air_gimp', 'elev_bed_gimp', 'elev_smooth_gimp', 'elev_surf_gimp', 'file_block', 'ind_decim', 'ind_decim_mid', 'ind_fence', 'ind_layer', 'ind_trace_start', 'int_bed', 'int_smooth', 'int_surf', 'lat', 'lon', 'num_decim', 'num_subtrans', ...
-                         'num_layer', 'num_trace_tot', 'thick', 'thick_decim', 'time', 'twtt_smooth', 'twtt_surf', 'x_pk', 'y_pk')
-disp(['Saved merged data in ' file_save 'mat.'])
+save(file_save, '-v7.3', 'depth_smooth', 'dist', 'elev_air_gimp', 'elev_bed_gimp', 'elev_smooth_gimp', 'elev_surf_gimp', 'file_block', 'ind_decim', 'ind_decim_mid', 'ind_trace_start', 'int_bed', 'int_smooth', 'int_surf', 'lat', 'lon', 'num_decim', 'num_subtrans', 'num_layer', 'num_trace_tot', ...
+                         'thick', 'thick_decim', 'time', 'twtt_smooth', 'twtt_surf', 'x_pk', 'y_pk')
+disp(['Saved merged data in ' file_save '.mat.'])
