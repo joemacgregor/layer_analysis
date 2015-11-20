@@ -25,7 +25,7 @@ function strain_layers(age_max, radar_type, do_strain, do_fix, do_uncert, do_bad
 % SHALLOW_STRAIN_FIT, SMOOTH_LOWESS and STRAIN_UNCERT.
 % 
 % Joe MacGregor (UTIG), Mark Fahnestock (UAF)
-% Last updated: 11/18/15
+% Last updated: 11/20/15
 
 if ~exist('dj_fit', 'file')
     error('strain_layers:djfit', 'Function DJ_FIT is not available within this user''s path.')
@@ -310,11 +310,11 @@ for ii = 1:num_year
                             = strain_rate_ref{ii}{jj}{kk}(curr_ind);
                 end
                 
-                if any(do_strain(5:6))
-                    [lon_strain_rate_slice, lat_strain_rate_slice] ...
-                            = deal(interp2(x_grd_strain, y_grd_strain, lon_strain_rate_grd, x_pk{ii}{jj}{kk}(ind_decim_mid{ii}{jj}{kk}(curr_ind)), y_pk{ii}{jj}{kk}(ind_decim_mid{ii}{jj}{kk}(curr_ind)), '*linear', NaN), ...
-                                   interp2(x_grd_strain, y_grd_strain, lat_strain_rate_grd, x_pk{ii}{jj}{kk}(ind_decim_mid{ii}{jj}{kk}(curr_ind)), y_pk{ii}{jj}{kk}(ind_decim_mid{ii}{jj}{kk}(curr_ind)), '*linear', NaN));
-                end
+                % current along-track longitudinal and lateral strain rate ratio
+                if any(do_strain([4 6 7]))
+                    horiz_strain_ratio_slice...
+                            = interp2(x_grd_strain, y_grd_strain, horiz_strain_ratio_grd, x_pk{ii}{jj}{kk}(ind_decim_mid{ii}{jj}{kk}(curr_ind)), y_pk{ii}{jj}{kk}(ind_decim_mid{ii}{jj}{kk}(curr_ind)), '*linear', NaN);
+                end                
                 
                 parfor ll = 1:length(curr_ind)
                     
@@ -327,7 +327,7 @@ for ii = 1:num_year
                             = deal(mean(-log(1 - (depth_smooth_cell{ll} ./ thick_slice(ll))) .* (thick_slice(ll) ./ curr_age{ll}))); %#ok<PFOUS>
                     
                     if do_strain(1) %#ok<PFBNS>
-                        try % standard Nye model (iterative)
+                        try % Nye
                             [accum_nye_slice(ll), res_nye_slice(ll)] ...
                                 = fminsearch(@nye_fit, accum_nye_start_slice(ll), opt, thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}); %#ok<PFOUS>
                             if do_uncert
@@ -343,7 +343,7 @@ for ii = 1:num_year
                     end
                     
                     if do_strain(2)
-                        try % Dansgaard-Johnsen model (original)
+                        try % Dansgaard-Johnsen
                             [tmp1, res_dj_slice(ll)] ...
                                 = fminsearch(@dj_fit, [accum_ref thick_shear_def], opt, thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}); %#ok<PFOUS>
                             [accum_dj_slice(ll), thick_shear_slice(ll)] ...
@@ -361,7 +361,7 @@ for ii = 1:num_year
                     end
                     
                     if do_strain(3)
-                        try % Nye + melt model
+                        try % Nye + melt
                             [tmp2, res_nye_melt_slice(ll)] ...
                                 = fminsearch(@nye_melt_fit, [accum_ref melt_rate_def], opt, thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}); %#ok<PFOUS>
                             [accum_nye_melt_slice(ll), melt_bed_slice(ll)] ...
@@ -379,35 +379,35 @@ for ii = 1:num_year
                     end
                     
                     if do_strain(4)
-                        try % Dansgaard-Johnsen model + basal melting
-                            [tmp3, res_dj_melt_slice(ll)] ...
-                                = fminsearch(@dj_melt_fit, [accum_ref thick_shear_def melt_bed_slice(ll) frac_slide_def], opt, thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}); %#ok<PFOUS>
-                            [accum_dj_melt_slice(ll), thick_shear_melt_slice(ll), melt_bed_dj_slice(ll), frac_slide_slice(ll)] ...
-                                = deal(tmp3(1), tmp3(2), tmp3(3), tmp3(4)); %#ok<PFOUS,NASGU>
+                        try % Nye + melt + lateral strain
+                            [tmp3, res_nye_melt_lat_slice(ll)] ...
+                                = fminsearch(@nye_melt_lat_fit, [accum_ref melt_rate_def], opt, thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, horiz_strain_ratio_slice(ll)); %#ok<PFOUS>
+                            [accum_nye_melt_lat_slice(ll), melt_bed_lat_slice(ll)] ...
+                                = deal(tmp3(1), tmp3(2)); %#ok<PFOUS>
                             if do_uncert
-                                [accum_dj_melt_uncert_slice(:, ll), thick_shear_melt_uncert_slice(:, ll), melt_bed_dj_uncert_slice(:, ll), frac_slide_uncert_slice(:, ll)] ...
-                                    = strain_uncert(frac_test, conf_uncert, 'dj_melt', thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, tmp3, res_dj_melt_slice(ll)); %#ok<PFOUS,NASGU>
+                                [accum_nye_melt_lat_uncert_slice(:, ll), melt_bed_lat_uncert_slice(:, ll)] ...
+                                    = strain_uncert(frac_test, conf_uncert, 'nye_melt_lat', thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, tmp3, res_nye_melt_slice(ll), horiz_strain_ratio_slice(ll)); %#ok<PFOUS,NASGU>
                             end
                             accum_ref ...
-                                = accum_dj_melt_slice(ll);
+                                = accum_nye_melt_lat_slice(ll);
                         catch
                             ind_strain_fail_slice(ll) ...
                                 = 4;
                         end
-                    end
+                    end                    
                     
                     if do_strain(5)
-                        try % Dansgaard-Johnsen model + lateral strain
-                            [tmp4, res_dj_lat_slice(ll)] ...
-                                = fminsearch(@dj_lat_fit, [accum_ref thick_shear_def], opt, thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, lon_strain_rate_slice(ll), lat_strain_rate_slice(ll)); %#ok<PFOUS>
-                            [accum_dj_lat_slice(ll), thick_shear_lat_slice(ll)] ...
-                                = deal(tmp4(1), tmp4(2)); %#ok<PFOUS,NASGU>
+                        try % Dansgaard-Johnsen model + basal melting
+                            [tmp4, res_dj_melt_slice(ll)] ...
+                                = fminsearch(@dj_melt_fit, [accum_ref thick_shear_def melt_bed_slice(ll) frac_slide_def], opt, thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}); %#ok<PFOUS>
+                            [accum_dj_melt_slice(ll), thick_shear_melt_slice(ll), melt_bed_dj_slice(ll), frac_slide_slice(ll)] ...
+                                = deal(tmp4(1), tmp4(2), tmp4(3), tmp4(4)); %#ok<PFOUS,NASGU>
                             if do_uncert
-                                [accum_dj_lat_uncert_slice(:, ll), thick_shear_lat_uncert_slice(:, ll)] ...
-                                    = strain_uncert(frac_test, conf_uncert, 'dj_lat', thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, tmp4, res_dj_lat_slice(ll), lon_strain_rate_slice(ll), lat_strain_rate_slice(ll)); %#ok<PFOUS,NASGU>
+                                [accum_dj_melt_uncert_slice(:, ll), thick_shear_melt_uncert_slice(:, ll), melt_bed_dj_uncert_slice(:, ll), frac_slide_uncert_slice(:, ll)] ...
+                                    = strain_uncert(frac_test, conf_uncert, 'dj_melt', thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, tmp4, res_dj_melt_slice(ll)); %#ok<PFOUS,NASGU>
                             end
                             accum_ref ...
-                                = accum_dj_lat_slice(ll);
+                                = accum_dj_melt_slice(ll);
                         catch
                             ind_strain_fail_slice(ll) ...
                                 = 5;
@@ -415,13 +415,17 @@ for ii = 1:num_year
                     end
                     
                     if do_strain(6)
-                        try % Dansgaard-Johnsen model + surface strain
-                            [thick_shear_surf_slice(ll), res_dj_surf_slice(ll)] ...
-                                = fminsearch(@dj_surf_fit, thick_shear_def, opt, thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, lon_strain_rate_slice(ll), lat_strain_rate_slice(ll)); %#ok<PFOUS>
+                        try % Dansgaard-Johnsen model + lateral strain
+                            [tmp5, res_dj_lat_slice(ll)] ...
+                                = fminsearch(@dj_lat_fit, [accum_ref thick_shear_def], opt, thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, horiz_strain_ratio_slice(ll)); %#ok<PFOUS>
+                            [accum_dj_lat_slice(ll), thick_shear_lat_slice(ll)] ...
+                                = deal(tmp5(1), tmp5(2)); %#ok<PFOUS,NASGU>
                             if do_uncert
-                                thick_shear_surf_uncert_slice(:, ll) ...
-                                    = strain_uncert(frac_test, conf_uncert, 'dj_surf', thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, thick_shear_surf_slice(ll), res_dj_surf_slice(ll), lon_strain_rate_slice(ll), lat_strain_rate_slice(ll)); %#ok<PFOUS,NASGU>
+                                [accum_dj_lat_uncert_slice(:, ll), thick_shear_lat_uncert_slice(:, ll)] ...
+                                    = strain_uncert(frac_test, conf_uncert, 'dj_lat', thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, tmp5, res_dj_lat_slice(ll), horiz_strain_ratio_slice(ll)); %#ok<PFOUS,NASGU>
                             end
+                            accum_ref ...
+                                = accum_dj_lat_slice(ll);
                         catch
                             ind_strain_fail_slice(ll) ...
                                 = 6;
@@ -429,7 +433,21 @@ for ii = 1:num_year
                     end
                     
                     if do_strain(7)
-                        try % shallow strain model
+                        try % Dansgaard-Johnsen model + surface strain
+                            [thick_shear_surf_slice(ll), res_dj_surf_slice(ll)] ...
+                                = fminsearch(@dj_surf_fit, thick_shear_def, opt, thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, horiz_strain_ratio_slice(ll)); %#ok<PFOUS>
+                            if do_uncert
+                                thick_shear_surf_uncert_slice(:, ll) ...
+                                    = strain_uncert(frac_test, conf_uncert, 'dj_surf', thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, thick_shear_surf_slice(ll), res_dj_surf_slice(ll), horiz_strain_ratio_slice(ll)); %#ok<PFOUS,NASGU>
+                            end
+                        catch
+                            ind_strain_fail_slice(ll) ...
+                                = 7;
+                        end
+                    end
+                    
+                    if do_strain(8)
+                        try % shallow strain
                             if do_fix
                                 [accum_shallow_slice(ll), res_shallow_slice(ll)] ...
                                     = fminsearch(@shallow_strain_fix, accum_ref, opt, depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, strain_rate_slice(ll)); %#ok<PFOUS>
@@ -438,18 +456,18 @@ for ii = 1:num_year
                                         = strain_uncert(frac_test, conf_uncert, 'shallow_strain', thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, accum_shallow_slice(ll), res_shallow_slice(ll)); %#ok<PFOUS>
                                 end
                             else
-                                [tmp5, res_shallow_slice(ll)] ...
+                                [tmp6, res_shallow_slice(ll)] ...
                                     = fminsearch(@shallow_strain_fit, [accum_ref (accum_ref / thick_slice(ll))], opt, depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll});
                                 [accum_shallow_slice(ll), strain_rate_slice(ll)] ...
-                                    = deal(tmp5(1), tmp5(2));
+                                    = deal(tmp6(1), tmp6(2));
                                 if do_uncert
                                     [accum_shallow_uncert_slice(:, ll), strain_rate_uncert_slice(:, ll)] ...
-                                        = strain_uncert(frac_test, conf_uncert, 'shallow_strain', thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, tmp5, res_shallow_slice(ll)); %#ok<PFOUS,NASGU>
+                                        = strain_uncert(frac_test, conf_uncert, 'shallow_strain', thick_slice(ll), depth_smooth_cell{ll}, curr_age{ll}, curr_age_uncert{ll}, tmp6, res_shallow_slice(ll)); %#ok<PFOUS,NASGU>
                                 end
                             end
                         catch
                             ind_strain_fail_slice(ll) ...
-                                = 7;
+                                = 8;
                         end
                     end
                 end
@@ -473,7 +491,7 @@ for ii = 1:num_year
                             = NaN(2, num_decim{ii}{jj}(kk)); %#ok<AGROW>
                 
                 % current along-track longitudinal and lateral strain rates
-                if any(do_strain([4 6:7]))
+                if any(do_strain([4 6 7]))
                     horiz_strain_ratio_curr ...
                             = interp2(x_grd_strain, y_grd_strain, horiz_strain_ratio_grd, x_pk{ii}{jj}{kk}(ind_decim_mid{ii}{jj}{kk}), y_pk{ii}{jj}{kk}(ind_decim_mid{ii}{jj}{kk}), '*linear', NaN);
                 end
@@ -492,7 +510,7 @@ for ii = 1:num_year
                             = deal(mean(-log(1 - (depth_smooth_decim(curr_layer, ll) ./ thick_decim{ii}{jj}{kk}(ll))) .* (thick_decim{ii}{jj}{kk}(ll) ./ age_trim(curr_layer)))); %#ok<AGROW>
                     
                     if do_strain(1)
-                        try % standard Nye model (iterative)
+                        try % Nye
                             [accum_nye{ii}{jj}{kk}(ll), res_nye{ii}{jj}{kk}(ll)] ...
                                 = fminsearch(@nye_fit, accum_nye_start{ii}{jj}{kk}(ll), opt, thick_decim{ii}{jj}{kk}(ll), depth_smooth_decim(curr_layer, ll), age_trim(curr_layer), age_uncert_trim(curr_layer)); %#ok<AGROW>
                             if do_uncert
@@ -508,7 +526,7 @@ for ii = 1:num_year
                     end
                     
                     if do_strain(2)
-                        try % Dansgaard-Johnsen model (original)
+                        try % Dansgaard-Johnsen
                             [tmp6, res_dj{ii}{jj}{kk}(ll)] ...
                                 = fminsearch(@dj_fit, [accum_ref thick_shear_def], opt, thick_decim{ii}{jj}{kk}(ll), depth_smooth_decim(curr_layer, ll), age_trim(curr_layer), age_uncert_trim(curr_layer)); %#ok<AGROW>
                             [accum_dj{ii}{jj}{kk}(ll), thick_shear{ii}{jj}{kk}(ll)] ...
@@ -526,7 +544,7 @@ for ii = 1:num_year
                     end
                     
                     if do_strain(3)
-                        try % Nye + melt model
+                        try % Nye + melt
                             [tmp7, res_nye_melt{ii}{jj}{kk}(ll)] ...
                                 = fminsearch(@nye_melt_fit, [accum_ref melt_rate_def], opt, thick_decim{ii}{jj}{kk}(ll), depth_smooth_decim(curr_layer, ll), age_trim(curr_layer), age_uncert_trim(curr_layer)); %#ok<AGROW>
                             [accum_nye_melt{ii}{jj}{kk}(ll), melt_bed{ii}{jj}{kk}(ll)] ...
@@ -544,7 +562,7 @@ for ii = 1:num_year
                     end
                     
                     if do_strain(4)
-                        try % Nye + melt + horizontal strain model
+                        try % Nye + melt + horizontal strain
                             [tmp7, res_nye_melt_lat{ii}{jj}{kk}(ll)] ...
                                 = fminsearch(@nye_melt_lat_fit, [accum_ref melt_rate_def], opt, thick_decim{ii}{jj}{kk}(ll), depth_smooth_decim(curr_layer, ll), age_trim(curr_layer), age_uncert_trim(curr_layer), horiz_strain_ratio_curr(ll)); %#ok<AGROW>
                             [accum_nye_melt_lat{ii}{jj}{kk}(ll), melt_bed_lat{ii}{jj}{kk}(ll)] ...
@@ -562,7 +580,7 @@ for ii = 1:num_year
                     end
                     
                     if do_strain(5)
-                        try % Dansgaard-Johnsen model + basal melting
+                        try % Dansgaard-Johnsen + basal melting
                             [tmp8, res_dj_melt{ii}{jj}{kk}(ll)] ...
                                 = fminsearch(@dj_melt_fit, [accum_ref thick_shear_def melt_bed{ii}{jj}{kk}(ll) frac_slide_def], opt, thick_decim{ii}{jj}{kk}(ll), depth_smooth_decim(curr_layer, ll), age_trim(curr_layer), age_uncert_trim(curr_layer)); %#ok<AGROW>
                             [accum_dj_melt{ii}{jj}{kk}(ll), thick_shear_melt{ii}{jj}{kk}(ll), melt_bed_dj{ii}{jj}{kk}(ll), frac_slide{ii}{jj}{kk}(ll)] ...
@@ -580,7 +598,7 @@ for ii = 1:num_year
                     end
                     
                     if do_strain(6)
-                        try % Dansgaard-Johnsen model + lateral strain
+                        try % Dansgaard-Johnsen + lateral strain
                             [tmp9, res_dj_lat{ii}{jj}{kk}(ll)] ...
                                 = fminsearch(@dj_lat_fit, [accum_ref thick_shear_def], opt, thick_decim{ii}{jj}{kk}(ll), depth_smooth_decim(curr_layer, ll), age_trim(curr_layer), age_uncert_trim(curr_layer), horiz_strain_ratio_curr(ll)); %#ok<AGROW>
                             [accum_dj_lat{ii}{jj}{kk}(ll), thick_shear_lat{ii}{jj}{kk}(ll)] ...
@@ -599,7 +617,7 @@ for ii = 1:num_year
                     end
                     
                     if do_strain(7)
-                        try % Dansgaard-Johnsen model + surface strain
+                        try % Dansgaard-Johnsen + surface strain
                             [thick_shear_surf{ii}{jj}{kk}(ll), res_dj_surf{ii}{jj}{kk}(ll)] ...
                                 = fminsearch(@dj_surf_fit, thick_shear_def, opt, thick_decim{ii}{jj}{kk}(ll), depth_smooth_decim(curr_layer, ll), age_trim(curr_layer), age_uncert_trim(curr_layer), horiz_strain_ratio_curr(ll)); %#ok<AGROW>
                             if do_uncert
@@ -614,7 +632,7 @@ for ii = 1:num_year
                     end
                     
                     if do_strain(8)
-                        try % shallow strain layer model
+                        try % shallow strain
                             if do_fix
                                 [accum_shallow{ii}{jj}{kk}(ll), res_shallow{ii}{jj}{kk}(ll)] ...
                                     = fminsearch(@shallow_strain_fix, accum_ref, opt, depth_smooth_decim(curr_layer, ll), age_trim(curr_layer), age_uncert_trim(curr_layer), strain_rate_ref{ii}{jj}{kk}(ll)); %#ok<AGROW>
